@@ -1,0 +1,22 @@
+# CLI and general utilities
+click>=8.0.0
+
+# Static analysis & AST parsing
+asttokens>=2.4.0  # Needed if you want better source location tracking in AST
+typed-ast>=1.5.5  # Alternative Python AST parser (optional)
+
+# Report generation
+python-docx>=1.0.0   # For .docx (pentest-style) reports
+tabulate>=0.9.0      # For pretty console tables (optional)
+
+# JSON schema validation (optional for config/rules)
+jsonschema>=4.18.0
+
+# Java support (external tool wrappers, optional)
+jpype1>=1.4.1        # Python-Java bridge if integrating Java parsers
+
+# Linting, testing, and dev tools
+pytest>=7.4.0
+coverage>=7.2.0
+mypy>=1.4.0          # Optional: static type checker
+black>=24.0.0        # Optional: formatter
