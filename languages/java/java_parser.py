@@ -2,25 +2,38 @@ import jpype
 import jpype.imports
 import os
 import re
+import urllib.request
 from core.result import Result, Severity
 from languages.java import java_rules
 
-# Start JVM
-JAVAPARSER_JAR_PATH = os.path.join(os.path.dirname(__file__), 'javaparser-core-3.25.4.jar')
-if not jpype.isJVMStarted():
-    jpype.startJVM(classpath=[JAVAPARSER_JAR_PATH])
+# Constants
+JAR_NAME = 'javaparser-core-3.25.4.jar'
+JAR_PATH = os.path.join(os.path.dirname(__file__), JAR_NAME)
+JAR_URL = f'https://repo1.maven.org/maven2/com/github/javaparser/javaparser-core/3.25.4/{JAR_NAME}'
 
-from com.github.javaparser import JavaParser
+# Ensure the jar is downloaded
+def ensure_jar():
+    if not os.path.exists(JAR_PATH):
+        print(f"[+] Downloading {JAR_NAME}...")
+        urllib.request.urlretrieve(JAR_URL, JAR_PATH)
+        print("[+] Download complete.")
 
+# Run analysis on a Java file
 def run_analysis(file_path):
-    with open(file_path, 'r') as file:
-        source_code = file.read()
+    ensure_jar()
 
-    parse_result = JavaParser.parse(source_code)
+    if not jpype.isJVMStarted():
+        jpype.startJVM(classpath=[JAR_PATH])
+
+    # Import Java classes only after JVM is started
+    from com.github.javaparser import JavaParser
+    from java.io import File
+
+    java_file = File(file_path)
+    parse_result = JavaParser.parse(java_file)
     rules = java_rules.get_rules()
     findings = []
 
-    # Traverse every node by converting to string and matching
     nodes = parse_result.findAll(jpype.JClass("com.github.javaparser.ast.Node"))
     for node in nodes:
         code = str(node)
@@ -34,4 +47,5 @@ def run_analysis(file_path):
                     line=line,
                     severity=Severity[rule.severity.upper()]
                 ).to_dict())
+
     return findings
