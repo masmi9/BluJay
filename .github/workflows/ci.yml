@@ -1,15 +1,37 @@
 name: BluJay CI
+
 on: [push, pull_request]
+
 jobs:
   run-blujay:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v3
-      - name: Set up Python
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python 3.11
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
-      - name: Install BluJay
-        run: pip install .
-      - name: Run Static Analysis
-        run: blujay scan --input ./examples --lang python --output blu_output.csv
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+
+      - name: Verify structure
+        run: python scripts/verify_structure.py
+
+      - name: Run BluJay Static Analysis (Python)
+        run: python -m blucli.main --input tests/positive --lang python --output blu_output_python.csv
+
+      - name: Run BluJay Static Analysis (Java)
+        run: python -m blucli.main --input tests/positive --lang java --output blu_output_java.csv
+
+      - name: Show Findings
+        run: |
+          echo "Python Findings:"
+          cat blu_output_python.csv || echo "No Python findings."
+          echo "Java Findings:"
+          cat blu_output_java.csv || echo "No Java findings."

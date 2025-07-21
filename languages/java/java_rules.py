@@ -30,7 +30,7 @@ def get_rules():
             rule_id="A03",
             desc="Potential command injection via Runtime.exec",
             severity="High",
-            pattern=r"Runtime\.getRuntime\(\)\.exec"
+            pattern=r"Runtime\.getRuntime\(\).*?\.exec"
         ),
         JavaRule(
             rule_id="A04",

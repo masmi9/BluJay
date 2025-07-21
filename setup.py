@@ -12,7 +12,7 @@ with open("README.md", "r", encoding="utf-8") as f:
 
 setup(
     name="blujay",
-    version="0.1.0",
+    version="0.1.1",
     author="Malik Smith",
     author_email="youremail@example.com",
     description="BluJay - Static Analysis Tool for Java and Python with OWASP Top Ten coverage",
@@ -31,7 +31,7 @@ setup(
         "Intended Audience :: Developers",
         "Development Status :: 3 - Alpha"
     ],
-    packages=find_packages(exclude=["tests", "examples"]),
+    packages=find_packages(include=["blucli*", "core*", "languages*"]),
     python_requires=">=3.8",
     install_requires=[
         "click>=8.0.0",
