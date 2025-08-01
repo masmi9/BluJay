@@ -39,7 +39,8 @@ setup(
         "typed-ast>=1.5.5",
         "python-docx>=1.0.0",
         "tabulate>=0.9.0",
-        "jsonschema>=4.18.0"
+        "jsonschema>=4.18.0",
+        "colorama>=0.4.6"
     ],
     extras_require={
         "dev": ["pytest", "coverage", "mypy", "black"]
