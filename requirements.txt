@@ -20,3 +20,10 @@ pytest>=7.4.0
 coverage>=7.2.0
 mypy>=1.4.0          # Optional: static type checker
 black>=24.0.0        # Optional: formatter
+
+# UI and visualization
+Flask>=2.2.0
+Werkzeug>=2.2.0
+jinja2>=3.1.0
+flask-bootstrap>=3.3.7.1    # Optional for better UI
+flask-wtf>=1.1.1            # Optional for secure forms

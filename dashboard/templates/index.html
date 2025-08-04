@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BluJay SAST Dashboard</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <script-src="{{url_for('static', filename='js/main.js')}}" defer></script>
+</head>
+<body>
+  <header>
+    <h1>BluJay Static Analysis Tool</h1>
+    <p>Java + Python | OWASP Top 10 | CVSS | Taint Tracking</p>
+  </header>
+
+  <div class="container">
+    <h2>Run a New Scan</h2>
+    <form id="scanForm" method="POST" enctype="multipart/form-data">
+      <label for="source_file">Upload File or Folder:</label>
+      <input type="file" name="source_folder" id="source_folder" webkitdirectory directory multiple required><br><br>
+
+      <label for="language">Select Language:</label>
+      <select name="language" id="language" required>
+        <option value="java">Java</option>
+        <option value="python">Python</option>
+      </select><br><br>
+
+      <button type="submit">Run Scan</button>
+    </form>
+
+    <h2>Scan Results</h2>
+    {% if results %}
+      <table>
+        <thead>
+          <tr>
+            <th>Rule ID</th>
+            <th>Description</th>
+            <th>Severity</th>
+            <th>File</th>
+            <th>Line</th>
+            <th>CVSS</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for finding in results %}
+            <tr>
+              <td>{{ finding.rule_id }}</td>
+              <td>{{ finding.desc }}</td>
+              <td>{{ finding.severity }}</td>
+              <td>{{ finding.file }}</td>
+              <td>{{ finding.line }}</td>
+              <td>{{ finding.cvss_score or 'N/A' }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p>No results to display.</p>
+    {% endif %}
+  </div>
+</body>
+</html>

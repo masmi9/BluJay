@@ -1,0 +1,73 @@
+body {
+  margin: 0;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: linear-gradient(to right, #0f2027, #203a43, #2c5364); /* deep tech blue */
+  color: #e0f7ff;
+}
+
+header {
+  padding: 20px;
+  text-align: center;
+  background-color: #0a192f;
+  border-bottom: 2px solid #00bfff;
+  color: #00bfff;
+}
+
+h1 {
+  margin: 0;
+  font-size: 2.5em;
+  letter-spacing: 2px;
+}
+
+.container {
+  padding: 30px;
+  max-width: 1200px;
+  margin: auto;
+  background-color: rgba(0, 0, 0, 0.3);
+  border-radius: 12px;
+  box-shadow: 0 0 12px #00bfff88;
+}
+
+button {
+  background-color: #00bfff;
+  color: #fff;
+  border: none;
+  padding: 12px 20px;
+  border-radius: 6px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+button:hover {
+  background-color: #009cd3;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+  background-color: #0a0a23;
+  color: #ffffff;
+}
+
+th, td {
+  padding: 12px;
+  text-align: left;
+  border-bottom: 1px solid #00bfff;
+}
+
+th {
+  background-color: #001f3f;
+}
+
+input[type="file"],
+select {
+  width: 100%;
+  padding: 10px;
+  margin: 10px 0;
+  background-color: #1a1a2e;
+  color: #e0f7ff;
+  border: 1px solid #00bfff;
+  border-radius: 5px;
+}

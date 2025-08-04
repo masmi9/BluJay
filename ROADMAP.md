@@ -52,60 +52,67 @@ blujay scan --input ./myapp --lang java --output results.json
 
 # BluJay SAST Tool Development Checklist
 
-## 🏋️ Product Planning
+### 🥇 Phase 1: CLI + Core Engine
 
-* [ ] Finalize BluJay's core vision and positioning
-* [ ] Define supported languages (Java, Kotlin, Python, JS, XML)
-* [ ] Create target threat models (e.g., OWASP, Mobile Top 10)
-* [ ] Design CLI UX and integration flow
-
-## 📁 Core Engine & Rule System
-
+* [ ] Design CLI UX and integration flow (crucial for early adopters, automation)
+    - [x] Implement blucli.main with `argparse`-based interface
+    - [x] Support `--input`, `--lang`, `--output` arguments
+    - [] Add real-time logging and progress indicators
+    - [] Add clear error messages and usage help
+    - [] Include `--debug` and `--ruleset` flags for advanced usage
+    - [] Provide example CLI usage in README.md
 * [ ] Build modular static analysis engine (AST + regex)
-* [ ] Implement YAML-based pattern rule engine
-* [ ] Implement Python rule scripting for taint & symbolic logic
+    - [x] Java parser integrated with `javaparser-core`
+    - [x] Java taint engine integrated
+    - [x] Pattern-based rule matching system (regex)
+    - [] Normalize and unify result output structure (CSV + JSON)
+    - [] Modular architecture for multi-language plugin support
+* [ ] Support rule metadata system (severity, CWE, remediation)
+    - [x] Static pattern rules implemented in `java_rules.py`
+    - [x] CVSS base score and OWASP Top 10 tagging
+    - [] Add support for YAML-based rule definitions
+    - [] Implement rule schema validation (e.g., `cerberus`, `jsonschema`)
+    - [] Build regression test runner for rule validation
+* [ ] Java/Kotlin AST parser + symbol resolver (language maturity for MVP)
+    - [x] Java parsing and analysis via AST (JavaParser)
+    - [] Kotlin support (AST or KotlinPoet/UAST Integration)
 * [ ] Add rule validation + regression test runner
-* [ ] Support rule metadata (severity, CWE, remediation)
+    - [] Add test cases to `tests/java/positive` and `negative/`
+    - [] Create assertion-based unit tests for rule detections
+    - [x] Set up CLI integration in `.github/workflows/ci.yml`
+    - [] Auto-run test suite on PR/commit via GitHub Actions
 
-## 📊 Language Support
+### 🥈 Phase 2: Web Dashboard MVP
 
-* [ ] Java/Kotlin AST parser + symbol resolver
-* [ ] XML manifest scanner with ICC detection
-* [ ] Python + JS tokenizer/parser integration
-* [ ] YAML/JSON config key extraction
+* [x] Web dashboard (team views) (essential for teams, PM visibility, triage)
+* [ ] HTML report generator with filters
+* [ ] Risk scoring per finding
+* [ ] Threat badge + scoring dashboard
 
-## 🔧 CI/CD Integration
+
+## Secondary: Ecosystem + Expansion
+
+### 🥉 Phase 3: CI/CD and Format Support
 
 * [ ] GitHub Actions template
 * [ ] GitLab CI pipeline support
 * [ ] Jenkinsfile integration sample
-* [ ] SARIF + JSON output formatting
+* [ ] SARIF + CSV + JSON output formatting
 * [ ] GitHub PR annotation support
 
-## 🔎 Threat Detection Rulepacks
+### 🔄 Phase 4: Rule & Language Expansion
 
-* [ ] SSRF, hardcoded fetcher detection
-* [ ] Reflection + WebView exported misuse
-* [ ] Command injection + insecure exec
-* [ ] Weak crypto flagging (ECB, MD5, etc.)
-* [ ] File/IPC access risks (tmp, sdcard, etc.)
+* [ ] XML manifest scanner (ICC)
+* [ ] Python/JS parser integration
+* [ ] Rulepacks: SSRF, Reflection, Crypto, Frida markers, etc.
 * [ ] Frida hookable logic markers
-* [ ] IOC pattern matching + enrichments
-
-## 📊 UX & Reporting
-
-* [ ] HTML report generator with filters
-* [ ] CSV + SARIF export
-* [ ] Add risk scoring per finding
-* [ ] Build auto-remediation suggestions engine
+* [ ] IOC pattern matching + enrichments (VirusTotal, OTX, AbuselPDB)
 
 ## 🚀 Future Enhancements
 
 * [ ] VSCode plugin (live rule hints)
-* [ ] Web dashboard (team views)
-* [ ] Threat badge + scoring dashboard
-* [ ] Integration with VirusTotal, OTX, AbuseIPDB
-* [ ] Frida-based dynamic context enrichment
+* [ ] Auto-remediation engine
+* [ ] Frida dynamic enrichment
 
 ---
 
