@@ -47,6 +47,6 @@ report:
 ## 🧠 AI Validation Layer
 
 BluJay can optionally use AI to help filter and explain findings:
-    - Supports `openai`, `anthropic`, `ollama`, or a built-in `dry_run` heuristic mode
-    - Adds a confidence score and quick explanation to each finding
-    - Helps teams spend less time on false positives and more time fixing real issues
+- Supports `openai`, `anthropic`, `ollama`, or a built-in `dry_run` heuristic mode
+- Adds a confidence score and quick explanation to each finding
+- Helps teams spend less time on false positives and more time fixing real issues
