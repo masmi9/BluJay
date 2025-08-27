@@ -1,0 +1,12 @@
+# BluJay config
+ai:
+  enabled: true
+  provider: dry_run      # options: dry_run, openai, anthropic, ollama
+  model: gpt-4o-mini
+  threshold: 0.75        # min confidence for true_positive
+scan:
+  max_findings: 2000
+  languages: [java, python]
+report:
+  formats: [json, csv]
+  output_dir: reports/
