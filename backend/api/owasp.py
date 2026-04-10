@@ -28,7 +28,8 @@ class StartScanRequest(BaseModel):
     mode: str = "deep"          # deep | quick
     platform: str = "android"   # android | ios
     analysis_id: int | None = None
-    device_serial: str | None = None   # if set, pull APK from device
+    device_serial: str | None = None   # Android: ADB serial to pull APK from
+    device_udid: str | None = None     # iOS: UDID for IODS dynamic plugin
 
 
 @router.post("", status_code=201, summary="Start an OWASP dynamic scan")
@@ -37,8 +38,17 @@ async def start_scan(
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ):
-    if body.device_serial:
-        # Pull APK from the connected device into the workspace
+    if body.platform == "ios" and body.device_udid and not body.apk_path:
+        # Pull IPA from the iOS device for IODS static analysis
+        from core import ios_device_manager
+        pulled_dir = settings.uploads_dir / "pulled_ios"
+        pulled_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            apk = await ios_device_manager.pull_ipa(body.device_udid, body.package_name, pulled_dir)
+        except RuntimeError as exc:
+            raise HTTPException(400, f"Failed to pull IPA from device: {exc}")
+    elif body.device_serial:
+        # Pull APK from the connected Android device
         pulled_dir = settings.uploads_dir / "pulled"
         pulled_dir.mkdir(parents=True, exist_ok=True)
         try:
@@ -48,7 +58,7 @@ async def start_scan(
     else:
         apk = Path(body.apk_path)
         if not apk.exists():
-            raise HTTPException(404, f"APK not found: {body.apk_path}")
+            raise HTTPException(404, f"APK/IPA not found: {body.apk_path}")
 
     scan = OwaspScan(
         platform=body.platform,
@@ -62,7 +72,7 @@ async def start_scan(
     await db.commit()
     await db.refresh(scan)
 
-    background_tasks.add_task(run_scan, scan.id, apk, body.package_name, body.mode, body.platform)
+    background_tasks.add_task(run_scan, scan.id, apk, body.package_name, body.mode, body.platform, body.device_udid)
     return {"id": scan.id, "status": "pending"}
 
 

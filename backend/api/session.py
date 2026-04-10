@@ -15,14 +15,18 @@ async def create_session(body: DynamicSessionCreate, db: AsyncSession = Depends(
         analysis_id=body.analysis_id,
         device_serial=body.device_serial,
         package_name=body.package_name,
+        platform=body.platform,
     )
     db.add(sess)
     await db.commit()
     await db.refresh(sess)
 
-    # Start logcat
-    from core.logcat_streamer import logcat_streamer
-    await logcat_streamer.start(sess.id, body.device_serial, body.package_name)
+    if body.platform == "ios":
+        from core.ios_syslog_streamer import ios_syslog_streamer
+        await ios_syslog_streamer.start(sess.id, body.device_serial)
+    else:
+        from core.logcat_streamer import logcat_streamer
+        await logcat_streamer.start(sess.id, body.device_serial, body.package_name)
 
     return sess
 
@@ -43,16 +47,17 @@ async def stop_session(session_id: int, db: AsyncSession = Depends(get_db)):
     if not sess:
         raise HTTPException(404, "Session not found")
 
-    # Stop logcat
-    from core.logcat_streamer import logcat_streamer
-    await logcat_streamer.stop(session_id)
+    if sess.platform == "ios":
+        from core.ios_syslog_streamer import ios_syslog_streamer
+        await ios_syslog_streamer.stop(session_id)
+    else:
+        from core.logcat_streamer import logcat_streamer
+        await logcat_streamer.stop(session_id)
 
-    # Stop proxy if running
     from api.router import get_proxy_manager
     pm = get_proxy_manager()
     await pm.stop(session_id)
 
-    # Detach Frida if attached
     from api.router import get_frida_manager
     fm = get_frida_manager()
     await fm.detach(session_id)

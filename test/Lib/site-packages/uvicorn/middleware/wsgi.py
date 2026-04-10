@@ -6,7 +6,7 @@ import io
 import sys
 import warnings
 from collections import deque
-from collections.abc import Iterable
+from typing import Iterable
 
 from uvicorn._types import (
     ASGIReceiveCallable,
@@ -82,7 +82,8 @@ def build_environ(scope: HTTPScope, message: ASGIReceiveEvent, body: io.BytesIO)
 class _WSGIMiddleware:
     def __init__(self, app: WSGIApp, workers: int = 10):
         warnings.warn(
-            "Uvicorn's native WSGI implementation is deprecated, you should switch to a2wsgi (`pip install a2wsgi`).",
+            "Uvicorn's native WSGI implementation is deprecated, you "
+            "should switch to a2wsgi (`pip install a2wsgi`).",
             DeprecationWarning,
         )
         self.app = app
@@ -150,7 +151,7 @@ class WSGIResponder:
                 if message is None:
                     return
                 await send(message)
-            else:  # pragma: no cover
+            else:
                 await self.send_event.wait()
                 self.send_event.clear()
 

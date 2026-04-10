@@ -1,11 +1,12 @@
 import { useState, useCallback, useMemo } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { Upload, CheckCircle, XCircle, Loader2, Package, Smartphone, Search, ArrowRight, Tablet, ShieldCheck, ShieldOff, Trash2 } from 'lucide-react'
+import { Upload, CheckCircle, XCircle, Loader2, Package, Smartphone, Search, ArrowRight, Tablet, ShieldCheck, ShieldOff, Trash2, Zap } from 'lucide-react'
 import { clsx } from 'clsx'
 import { analysisApi } from '@/api/analysis'
-import { adbApi } from '@/api/adb'
+import { adbApi, sessionApi } from '@/api/adb'
 import { iosApi } from '@/api/ios'
+import { proxyApi } from '@/api/proxy'
 import { useDeviceStore } from '@/store/deviceStore'
 import type { Analysis } from '@/types/analysis'
 import type { IosDeviceInfo } from '@/types/adb'
@@ -33,6 +34,8 @@ export default function Dashboard() {
   const [selectedIosUdid, setSelectedIosUdid] = useState<string>('')
   const [selectedBundleId, setSelectedBundleId] = useState('')
   const [iosPulling, setIosPulling] = useState(false)
+  const [iosDynStarting, setIosDynStarting] = useState(false)
+  const [iosIpaFile, setIosIpaFile] = useState<File | null>(null)
 
   const { devices, selectedSerial, selectDevice } = useDeviceStore()
 
@@ -95,10 +98,14 @@ export default function Dashboard() {
   }, [packages, packageSearch])
 
   const handleFile = useCallback(async (file: File) => {
-    if (!file.name.endsWith('.apk')) return
+    const isApk = file.name.endsWith('.apk')
+    const isIpa = file.name.endsWith('.ipa')
+    if (!isApk && !isIpa) return
     setUploading(true)
     try {
-      const result = await analysisApi.upload(file)
+      const result = isIpa
+        ? await iosApi.uploadIpa(file)
+        : await analysisApi.upload(file)
       refetch()
       navigate(`/analysis/${result.id}`)
     } finally {
@@ -134,6 +141,42 @@ export default function Dashboard() {
     }
   }, [effectiveIosUdid, selectedBundleId, navigate, refetch])
 
+  const handleIosDynamicSession = useCallback(async () => {
+    if (!effectiveIosUdid || !selectedBundleId) return
+    setIosDynStarting(true)
+    try {
+      // 1. Create dynamic session — starts idevicesyslog, no IPA pull needed
+      const session = await sessionApi.create({
+        deviceSerial: effectiveIosUdid,
+        packageName: selectedBundleId,
+        platform: 'ios',
+      })
+
+      // 2. Start mitmproxy for traffic interception
+      await proxyApi.start(session.id)
+
+      // 3. If the user already has an uploaded IPA analysis for this bundle, kick off
+      //    IODS deep scan linked to it. Otherwise they can trigger it from the OWASP
+      //    page after uploading the IPA manually.
+      if (iosIpaFile) {
+        const uploaded = await iosApi.uploadIpa(iosIpaFile)
+        await iosApi.startOwaspScan({
+          udid: effectiveIosUdid,
+          bundleId: selectedBundleId,
+          ipaPath: '',
+          analysisId: uploaded.id,
+        })
+      }
+
+      refetch()
+      navigate(`/dynamic/${session.id}`)
+    } catch (err: any) {
+      alert(`Failed to start iOS dynamic session: ${err?.response?.data?.detail ?? err.message}`)
+    } finally {
+      setIosDynStarting(false)
+    }
+  }, [effectiveIosUdid, selectedBundleId, iosIpaFile, navigate, refetch])
+
   const handleDelete = useCallback(async (e: React.MouseEvent, id: number) => {
     e.stopPropagation()
     setDeletingId(id)
@@ -157,9 +200,9 @@ export default function Dashboard() {
       <h1 className="text-lg font-semibold text-zinc-100">Dashboard</h1>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {/* --- Upload APK --- */}
+        {/* --- Upload APK / IPA --- */}
         <div className="space-y-2">
-          <h2 className="text-xs text-zinc-500 uppercase tracking-wide">Upload APK</h2>
+          <h2 className="text-xs text-zinc-500 uppercase tracking-wide">Upload APK / IPA</h2>
           <div
             className={clsx(
               'border-2 border-dashed rounded-xl p-8 flex flex-col items-center gap-3 transition-colors cursor-pointer',
@@ -171,7 +214,7 @@ export default function Dashboard() {
             onClick={() => {
               const input = document.createElement('input')
               input.type = 'file'
-              input.accept = '.apk'
+              input.accept = '.apk,.ipa'
               input.onchange = (e) => {
                 const file = (e.target as HTMLInputElement).files?.[0]
                 if (file) handleFile(file)
@@ -185,7 +228,7 @@ export default function Dashboard() {
               <Upload size={28} className="text-zinc-500" />
             )}
             <p className="text-sm text-zinc-400 text-center">
-              {uploading ? 'Uploading and analysing...' : 'Drop an APK here or click to browse'}
+              {uploading ? 'Uploading and analysing...' : 'Drop an APK or IPA here, or click to browse'}
             </p>
           </div>
         </div>
@@ -376,21 +419,63 @@ export default function Dashboard() {
                   <p className="text-xs text-zinc-600 text-center py-2">No apps found</p>
                 )}
 
-                <div className="flex justify-end">
+                {/* Optional IPA for IODS — used when device pull isn't supported */}
+                <div
+                  className="flex items-center gap-2 border border-dashed border-bg-border rounded px-2 py-1.5 cursor-pointer hover:border-zinc-500 transition-colors"
+                  onClick={() => {
+                    const input = document.createElement('input')
+                    input.type = 'file'
+                    input.accept = '.ipa'
+                    input.onchange = (e) => {
+                      const f = (e.target as HTMLInputElement).files?.[0]
+                      if (f) setIosIpaFile(f)
+                    }
+                    input.click()
+                  }}
+                >
+                  <Upload size={11} className="text-zinc-500 shrink-0" />
+                  <span className="text-[10px] text-zinc-500 truncate">
+                    {iosIpaFile ? iosIpaFile.name : 'Attach IPA for IODS scan (optional)'}
+                  </span>
+                  {iosIpaFile && (
+                    <button
+                      className="ml-auto text-zinc-600 hover:text-zinc-400"
+                      onClick={(e) => { e.stopPropagation(); setIosIpaFile(null) }}
+                    >×</button>
+                  )}
+                </div>
+
+                <div className="flex justify-end gap-2">
                   <button
                     onClick={handleIosPullAndAnalyze}
-                    disabled={!selectedBundleId || iosPulling}
+                    disabled={!selectedBundleId || iosPulling || iosDynStarting}
                     className={clsx(
                       'flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-colors',
-                      selectedBundleId && !iosPulling
+                      selectedBundleId && !iosPulling && !iosDynStarting
+                        ? 'bg-bg-elevated hover:bg-bg-border text-zinc-300 border border-bg-border'
+                        : 'bg-bg-elevated text-zinc-600 cursor-not-allowed border border-bg-border'
+                    )}
+                  >
+                    {iosPulling ? (
+                      <><Loader2 size={12} className="animate-spin" /> Pulling...</>
+                    ) : (
+                      <><ArrowRight size={12} /> Pull &amp; Analyze</>
+                    )}
+                  </button>
+                  <button
+                    onClick={handleIosDynamicSession}
+                    disabled={!selectedBundleId || iosDynStarting || iosPulling}
+                    className={clsx(
+                      'flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-colors',
+                      selectedBundleId && !iosDynStarting && !iosPulling
                         ? 'bg-accent hover:bg-accent-hover text-white'
                         : 'bg-bg-elevated text-zinc-600 cursor-not-allowed'
                     )}
                   >
-                    {iosPulling ? (
-                      <><Loader2 size={12} className="animate-spin" /> Pulling IPA...</>
+                    {iosDynStarting ? (
+                      <><Loader2 size={12} className="animate-spin" /> Starting...</>
                     ) : (
-                      <><ArrowRight size={12} /> Pull &amp; Analyze</>
+                      <><Zap size={12} /> Dynamic Session</>
                     )}
                   </button>
                 </div>

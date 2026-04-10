@@ -18,8 +18,18 @@ export const adbApi = {
 }
 
 export const sessionApi = {
-  create: (analysisId: number, deviceSerial: string, packageName: string) =>
-    api.post<DynamicSession>('/sessions', { analysis_id: analysisId, device_serial: deviceSerial, package_name: packageName }).then((r) => r.data),
+  create: (params: {
+    analysisId?: number
+    deviceSerial: string
+    packageName: string
+    platform?: 'android' | 'ios'
+  }) =>
+    api.post<DynamicSession>('/sessions', {
+      analysis_id: params.analysisId,
+      device_serial: params.deviceSerial,
+      package_name: params.packageName,
+      platform: params.platform ?? 'android',
+    }).then((r) => r.data),
   get: (id: number) => api.get<DynamicSession>(`/sessions/${id}`).then((r) => r.data),
   stop: (id: number) => api.delete(`/sessions/${id}`),
 }

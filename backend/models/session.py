@@ -14,11 +14,12 @@ class DynamicSession(Base):
     __tablename__ = "dynamic_sessions"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    analysis_id: Mapped[int] = mapped_column(ForeignKey("analyses.id", ondelete="CASCADE"), index=True)
+    analysis_id: Mapped[int | None] = mapped_column(ForeignKey("analyses.id", ondelete="SET NULL"), index=True, nullable=True)
     created_at: Mapped[datetime] = mapped_column(default=func.now())
 
-    device_serial: Mapped[str]
+    device_serial: Mapped[str]   # ADB serial for Android; UDID for iOS
     package_name: Mapped[str]
+    platform: Mapped[str] = mapped_column(default="android")  # android | ios
     status: Mapped[str] = mapped_column(default="active")  # active | stopped
     proxy_port: Mapped[int | None]
     frida_attached: Mapped[bool] = mapped_column(default=False)

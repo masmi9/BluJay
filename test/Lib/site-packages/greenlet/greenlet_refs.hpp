@@ -27,6 +27,26 @@ using std::endl;
 namespace greenlet
 {
     class Greenlet;
+    // _Py_IsFinalizing() is only set AFTER atexit handlers complete
+    // inside Py_FinalizeEx on ALL Python versions (including 3.11+).
+    // Code running in atexit handlers (e.g. uWSGI plugin cleanup
+    // calling Py_FinalizeEx, New Relic agent shutdown) can still call
+    // greenlet.getcurrent(), but by that time type objects or
+    // internal state may have been invalidated. This flag is set by
+    // an atexit handler registered at module init (LIFO = runs
+    // first).
+    //
+    // Because this is only set from an atexit handler, by which point
+    // we're single threaded, there should be no need to make it
+    // std::atomic<int>.
+    // TODO: Move this to the GreenletGlobals object?
+    static int g_greenlet_shutting_down;
+
+    static inline bool
+    IsShuttingDown()
+    {
+        return greenlet::g_greenlet_shutting_down || Py_IsFinalizing();
+    }
 
     namespace refs
     {
@@ -47,6 +67,9 @@ namespace greenlet
         GreenletChecker(void *p)
         {
             if (!p) {
+                return;
+            }
+            if (IsShuttingDown()) {
                 return;
             }
 
@@ -100,6 +123,9 @@ namespace greenlet
         ContextExactChecker(void *p)
         {
             if (!p) {
+                return;
+            }
+            if (IsShuttingDown()) {
                 return;
             }
             if (!PyContext_CheckExact(p)) {
@@ -878,18 +904,14 @@ namespace greenlet {
         {
         }
 
-        // PyAddObject(): Add a reference to the object to the module.
-        // On return, the reference count of the object is unchanged.
-        //
-        // The docs warn that PyModule_AddObject only steals the
-        // reference on success, so if it fails after we've incref'd
-        // or allocated, we're responsible for the decref.
+        // PyAddObject(): Add a new reference to the object to the module.
         void PyAddObject(const char* name, const long new_bool)
         {
-            OwnedObject p = OwnedObject::consuming(Require(PyBool_FromLong(new_bool)));
-            this->PyAddObject(name, p);
+            Require(PyModule_AddIntConstant(this->p, name, new_bool));
         }
 
+        // It is safe to pass a null value to this API because we use
+        // PyModule_AddObjectRef under the covers which allows null.
         void PyAddObject(const char* name, const OwnedObject& new_object)
         {
             // The caller already owns a reference they will decref
@@ -908,16 +930,11 @@ namespace greenlet {
             this->PyAddObject(name, reinterpret_cast<PyObject*>(&type));
         }
 
+    private:
+
         void PyAddObject(const char* name, PyObject* new_object)
         {
-            Py_INCREF(new_object);
-            try {
-                Require(PyModule_AddObject(this->p, name, new_object));
-            }
-            catch (const PyErrOccurred&) {
-                Py_DECREF(p);
-                throw;
-            }
+            Require(PyModule_AddObjectRef(this->p, name, new_object));
         }
     };
 
@@ -991,6 +1008,10 @@ namespace greenlet {
         }
     };
 
+    // TODO: When we run on 3.12+ only (GREENLET_312), switch to the
+    // ``PyErr_GetRaisedException`` family of functions. The
+    // ``PyErr_Fetch`` family is deprecated on 3.12+, but is part
+    // of the stable ABI so it's not going anywhere.
     class PyErrPieces
     {
     private:
@@ -1112,6 +1133,39 @@ namespace greenlet {
             return &this->p;
         }
     };
+
+#ifdef Py_GIL_DISABLED
+        // building on 3.13 or newer, free-threaded
+        class PyCriticalObjectSection {
+        private:
+            G_NO_COPIES_OF_CLS(PyCriticalObjectSection);
+            PyCriticalSection _py_cs;
+        public:
+            explicit PyCriticalObjectSection(PyObject* p)
+            {
+                PyCriticalSection_Begin(&this->_py_cs, p);
+            }
+            explicit PyCriticalObjectSection(const PyGreenlet* p)
+            : PyCriticalObjectSection(
+                  reinterpret_cast<PyObject*>(
+                      const_cast<PyGreenlet*>(p)))
+            {}
+            ~PyCriticalObjectSection()
+            {
+                PyCriticalSection_End(&this->_py_cs);
+            }
+        };
+#else
+        class PyCriticalObjectSection {
+        public:
+            explicit PyCriticalObjectSection(PyObject* UNUSED(p))
+            {}
+            explicit PyCriticalObjectSection(const PyGreenlet* UNUSED(p))
+            {}
+        };
+
+#endif
+
 
 };};
 

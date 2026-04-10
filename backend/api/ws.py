@@ -41,7 +41,7 @@ async def ws_analysis_progress(ws: WebSocket, analysis_id: int):
     await _ws_send_loop(ws, queue)
 
 
-# --- Logcat ---
+# --- Logcat (Android) ---
 
 @ws_router.websocket("/logcat/{session_id}")
 async def ws_logcat(ws: WebSocket, session_id: int):
@@ -52,6 +52,19 @@ async def ws_logcat(ws: WebSocket, session_id: int):
         await _ws_send_loop(ws, queue)
     finally:
         logcat_streamer.unsubscribe(session_id, queue)
+
+
+# --- Syslog (iOS) ---
+
+@ws_router.websocket("/syslog/{session_id}")
+async def ws_syslog(ws: WebSocket, session_id: int):
+    await ws.accept()
+    from core.ios_syslog_streamer import ios_syslog_streamer
+    queue = ios_syslog_streamer.subscribe(session_id)
+    try:
+        await _ws_send_loop(ws, queue)
+    finally:
+        ios_syslog_streamer.unsubscribe(session_id, queue)
 
 
 # --- Proxy flows ---

@@ -229,7 +229,7 @@ greenlet_internal_mod_init() noexcept
         m.PyAddObject("GREENLET_USE_CONTEXT_VARS", 1L);
         m.PyAddObject("GREENLET_USE_STANDARD_THREADING", 1L);
 
-        OwnedObject clocks_per_sec = OwnedObject::consuming(PyLong_FromSsize_t(CLOCKS_PER_SEC));
+        NewReference clocks_per_sec(Require(PyLong_FromSsize_t(CLOCKS_PER_SEC)));
         m.PyAddObject("CLOCKS_PER_SEC", clocks_per_sec);
 
         /* also publish module-level data as attributes of the greentype. */
@@ -239,7 +239,7 @@ greenlet_internal_mod_init() noexcept
         // shouldn't be encouraged so don't add new items here.
         for (const char* const* p = copy_on_greentype; *p; p++) {
             OwnedObject o = m.PyRequireAttr(*p);
-            PyDict_SetItemString(PyGreenlet_Type.tp_dict, *p, o.borrow());
+            Require(PyDict_SetItemString(PyGreenlet_Type.tp_dict, *p, o.borrow()));
         }
 
         /*
@@ -294,6 +294,26 @@ greenlet_internal_mod_init() noexcept
 #ifdef Py_GIL_DISABLED
         PyUnstable_Module_SetGIL(m.borrow(), Py_MOD_GIL_NOT_USED);
 #endif
+
+        // Register an atexit handler that sets
+        // g_greenlet_shutting_down. Python's atexit is LIFO:
+        // registered last = called first. By registering here (at
+        // import time, after most other libraries), our handler runs
+        // before their cleanup code, which may try to call
+        // greenlet.getcurrent() on objects whose type has been
+        // invalidated. _Py_IsFinalizing() alone is insufficient on
+        // ALL Python versions because it is only set AFTER atexit
+        // handlers complete inside Py_FinalizeEx.
+        {
+            NewReference atexit_mod(Require(PyImport_ImportModule("atexit")));
+            OwnedObject register_fn = atexit_mod.PyRequireAttr("register");
+            NewReference callback(Require(
+             PyCFunction_New(&_greenlet_atexit_method, NULL)));
+            NewReference args(Require(PyTuple_Pack(1, callback.borrow())));
+            NewReference result(Require(
+                PyObject_Call(register_fn.borrow(), args.borrow(), NULL)));
+        }
+
         return m.borrow(); // But really it's the main reference.
     }
     catch (const LockInitError& e) {

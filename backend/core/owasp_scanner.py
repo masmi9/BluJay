@@ -167,6 +167,7 @@ async def run_scan(
     package_name: str,
     mode: str = "deep",
     platform: str = "android",
+    device_udid: str | None = None,
     db_session_factory=None,
 ) -> None:
     """
@@ -215,6 +216,8 @@ async def run_scan(
             "--formats", "json",
             "--output-dir", str(output_dir),
         ]
+        if device_udid:
+            cmd.extend(["--device-udid", device_udid])
         scanner_dir = scanner.parent
     else:
         scanner = _find_dyna_py()

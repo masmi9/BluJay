@@ -2,8 +2,6 @@
 """
 Testing scenarios that may have leaked.
 """
-from __future__ import print_function, absolute_import, division
-
 import sys
 import gc
 
@@ -322,8 +320,6 @@ class TestLeaks(TestCase):
         # false negatives. At the moment, those false results seem to have
         # resolved, so we are actually running this on 3.8+
         assert sys.version_info[0] >= 3
-        if sys.version_info[:2] < (3, 8):
-            self.skipTest('Only observed on 3.11')
         if RUNNING_ON_MANYLINUX:
             self.skipTest("Slow and not worth repeating here")
 
@@ -445,7 +441,15 @@ class TestLeaks(TestCase):
 
         self.wait_for_pending_cleanups()
         uss_after = self.get_process_uss()
-        self.assertLessEqual(uss_after, uss_before, "after attempts %d" % (count,))
+        # On Windows, USS can fluctuate by tens of KB between measurements
+        # due to working set trimming, page table updates, etc. Allow a
+        # small tolerance so OS-level noise doesn't cause false failures.
+        # Real leaks produce MBs of growth (each iteration creates 20k
+        # greenlets), so 512 KB is well below the detection threshold for
+        # genuine issues.
+        tolerance = 512 * 1024 if WIN else 0
+        self.assertLessEqual(uss_after, uss_before + tolerance,
+                             "after attempts %d" % (count,))
 
     @ignores_leakcheck
     # Because we're just trying to track raw memory, not objects, and running

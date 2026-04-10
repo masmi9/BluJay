@@ -120,9 +120,13 @@ async def pull_ipa(udid: str, bundle_id: str, output_dir: Path) -> Path:
         timeout=120,
     )
     if rc != 0:
-        raise RuntimeError(
-            f"ideviceinstaller failed (exit {rc}): {stderr.strip() or stdout.strip()}"
-        )
+        combined = stderr.strip() or stdout.strip()
+        if "unrecognized option" in combined and "--download" in combined:
+            raise RuntimeError(
+                "This build of ideviceinstaller does not support --download. "
+                "Upload the IPA manually via the Dashboard instead."
+            )
+        raise RuntimeError(f"ideviceinstaller failed (exit {rc}): {combined}")
 
     # ideviceinstaller writes <BundleId>-<version>.ipa or <BundleId>.ipa
     matches = list(output_dir.glob(f"{bundle_id}*.ipa"))

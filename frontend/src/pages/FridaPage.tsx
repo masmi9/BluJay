@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Virtuoso } from 'react-virtuoso'
 import { Zap, Play, Square, Trash2, ChevronDown, ChevronRight, Save, X, BookOpen, RefreshCw, Search } from 'lucide-react'
@@ -67,13 +67,23 @@ export default function FridaPage() {
     queryFn: fridaApi.listScripts,
   })
 
-  const { data: processes = [], refetch: refetchProcesses, isFetching: fetchingProcs } = useQuery({
+  const { data: processes = [], refetch: refetchProcesses, isFetching: fetchingProcs, error: processError } = useQuery({
     queryKey: ['frida-processes', selectedSerial],
     queryFn: () => fridaApi.processes(selectedSerial),
     enabled: !!selectedSerial,
     retry: false,
     staleTime: 10_000,
   })
+
+  // Auto-select the first available device when device lists load
+  useEffect(() => {
+    if (selectedSerial) return
+    if (connected.length > 0) {
+      setSelectedSerial(connected[0].serial)
+    } else if (iosDevices.length > 0) {
+      setSelectedSerial(iosDevices[0].udid)
+    }
+  }, [connected, iosDevices, selectedSerial])
 
   const filteredProcesses = useMemo(() => {
     if (!processFilter) return processes
@@ -226,6 +236,13 @@ export default function FridaPage() {
               )}
             </div>
 
+            {/* Process list error */}
+            {!activeSession && processError && (
+              <p className="text-[10px] text-red-400 font-mono px-1">
+                {(processError as any)?.response?.data?.detail ?? 'Failed to list processes — is frida-server running on the device?'}
+              </p>
+            )}
+
             {/* Process list */}
             {!activeSession && filteredProcesses.length > 0 && (
               <div className="flex flex-wrap gap-1 max-h-20 overflow-auto">
@@ -320,7 +337,7 @@ export default function FridaPage() {
                       attached={attached}
                       onLoad={() => { setCustomScript(s.source); setActiveTab('editor') }}
                       onRun={async () => {
-                        if (!sessionId || !attached) return
+                        if (sessionId == null || !attached) return
                         await fridaApi.loadCustom(sessionId, s.source)
                       }}
                       onDelete={() => deleteSaved(s.id)}

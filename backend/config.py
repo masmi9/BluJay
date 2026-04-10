@@ -41,8 +41,13 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
 
     @property
+    def _ws(self) -> Path:
+        """workspace_dir with ~ expanded (so WORKSPACE_DIR=~/.foo in .env works on Windows)."""
+        return self.workspace_dir.expanduser()
+
+    @property
     def db_path(self) -> Path:
-        return self.workspace_dir / "apkanalysis.db"
+        return self._ws / "apkanalysis.db"
 
     @property
     def db_url(self) -> str:
@@ -50,15 +55,15 @@ class Settings(BaseSettings):
 
     @property
     def decompile_dir(self) -> Path:
-        return self.workspace_dir / "decompiled"
+        return self._ws / "decompiled"
 
     @property
     def uploads_dir(self) -> Path:
-        return self.workspace_dir / "uploads"
+        return self._ws / "uploads"
 
     @property
     def mitmproxy_cert_dir(self) -> Path:
-        return self.workspace_dir / "mitmproxy-ca"
+        return self._ws / "mitmproxy-ca"
 
     @property
     def wordlists_dir(self) -> Path:
@@ -66,10 +71,10 @@ class Settings(BaseSettings):
 
     @property
     def screenshots_dir(self) -> Path:
-        return self.workspace_dir / "screenshots"
+        return self._ws / "screenshots"
 
     def ensure_dirs(self) -> None:
-        for d in (self.workspace_dir, self.decompile_dir, self.uploads_dir,
+        for d in (self._ws, self.decompile_dir, self.uploads_dir,
                   self.mitmproxy_cert_dir, self.screenshots_dir):
             d.mkdir(parents=True, exist_ok=True)
 
