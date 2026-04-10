@@ -1,11 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>BluJay SAST Dashboard</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-  <script-src="{{url_for('static', filename='js/main.js')}}" defer></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+  <script src="{{ url_for('static', filename='js/jszip.min.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='js/main.js') }}" defer></script>
 </head>
 <body>
   <header>
@@ -15,21 +16,33 @@
 
   <div class="container">
     <h2>Run a New Scan</h2>
-    <form id="scanForm" method="POST" enctype="multipart/form-data">
-      <label for="source_file">Upload File or Folder:</label>
-      <input type="file" name="source_folder" id="source_folder" webkitdirectory directory multiple required><br><br>
+    <!-- Post to /scan; backend handles upload/extract/run then redirects to /results/<job_id> -->
+    <form id="scanForm" action="{{ url_for('dashboard.run_scan') }}" method="POST" enctype="multipart/form-data">
+      <label for="source_file">Upload File (.java, .py) or Archive (.zip, .jar):</label><br />
+      <input
+        type="file"
+        name="source_file"
+        id="source_file"
+        required
+        title="Select a file or an archive to scan"
+        accept=".java,.py,.zip,.jar"
+      />
+      <br /><br />
 
-      <label for="language">Select Language:</label>
+      <label for="language">Select Language:</label><br />
       <select name="language" id="language" required>
         <option value="java">Java</option>
         <option value="python">Python</option>
-      </select><br><br>
+      </select>
+      <br /><br />
 
       <button type="submit">Run Scan</button>
     </form>
 
-    <h2>Scan Results</h2>
+    <!-- Optional inline results (useful if you render results directly on index)
+         If you're redirecting to /results/<job_id>, this block will simply not show. -->
     {% if results %}
+      <h2>Scan Results</h2>
       <table>
         <thead>
           <tr>
@@ -44,18 +57,16 @@
         <tbody>
           {% for finding in results %}
             <tr>
-              <td>{{ finding.rule_id }}</td>
-              <td>{{ finding.desc }}</td>
+              <td>{{ finding.rule_id or finding.get('rule') }}</td>
+              <td>{{ finding.desc or finding.get('description') }}</td>
               <td>{{ finding.severity }}</td>
-              <td>{{ finding.file }}</td>
-              <td>{{ finding.line }}</td>
+              <td>{{ finding.file or finding.get('path') }}</td>
+              <td>{{ finding.line or finding.get('start_line') }}</td>
               <td>{{ finding.cvss_score or 'N/A' }}</td>
             </tr>
           {% endfor %}
         </tbody>
       </table>
-    {% else %}
-      <p>No results to display.</p>
     {% endif %}
   </div>
 </body>

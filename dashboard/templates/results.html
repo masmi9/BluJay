@@ -1,0 +1,63 @@
+<!-- dashboard/templates/results.html -->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>BluJay — Results {{ job_id }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      body { font-family: system-ui, Arial, sans-serif; margin: 2rem; }
+      .wrap { max-width: 1100px; margin: 0 auto; }
+      table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+      th, td { text-align: left; padding: .6rem .5rem; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
+      th { background: #f8fafc; }
+      .pill { display: inline-block; padding: .1rem .5rem; border-radius: 999px; font-size: .8rem; }
+      .sev-critical { background: #fee2e2; color: #991b1b; }
+      .sev-high { background: #ffedd5; color: #9a3412; }
+      .sev-medium { background: #fef9c3; color: #854d0e; }
+      .sev-low { background: #dcfce7; color: #065f46; }
+      .actions { margin-top: 1rem; }
+      a.btn { text-decoration: none; padding: .5rem .8rem; border-radius: 8px; background: #e5e7eb; color: #111827; margin-right: .5rem; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>BluJay — Scan Results</h1>
+      <p>Job: <code>{{ job_id }}</code></p>
+
+      <div class="actions">
+        <a class="btn" href="{{ url_for('dashboard.index') }}">New Scan</a>
+      </div>
+
+      {% if findings and findings|length > 0 %}
+        <table>
+          <thead>
+            <tr>
+              <th>Severity</th>
+              <th>Rule / Title</th>
+              <th>File</th>
+              <th>Line</th>
+              <th>Message</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for f in findings %}
+              {% set sev = (f.severity or f.get('severity', ''))|lower %}
+              <tr>
+                <td>
+                  <span class="pill sev-{{ sev }}">{{ f.severity or f.get('severity', '—') }}</span>
+                </td>
+                <td>{{ f.rule_id or f.rule or f.title or '—' }}</td>
+                <td>{{ f.file or f.path or '—' }}</td>
+                <td>{{ f.line or f.start_line or '—' }}</td>
+                <td>{{ f.message or f.description or f.detail or '—' }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <p>No findings found.</p>
+      {% endif %}
+    </div>
+  </body>
+</html>
