@@ -1,0 +1,41 @@
+# AODS AutoResearch default configuration
+# Override via CLI flags or by editing this file.
+
+# Search mode: grid, random, or llm
+mode: random
+
+# Maximum experiments before stopping
+max_experiments: 50
+
+# Maximum wall time in minutes
+max_wall_time_minutes: 120
+
+# Scan profile for corpus scans
+scan_profile: standard
+
+# Per-scan timeout in seconds
+scan_timeout_seconds: 600
+
+# Parameter tiers to tune (1=global FP, 2=per-source, 3=per-category)
+param_tiers: [1]
+
+# Random mode: number of params to mutate per iteration
+random_mutations_per_iter: 3
+
+# Safety: abort if detection regresses more than this %
+max_regression_pct: 10.0
+
+# Keep top N experiment configs
+keep_top_n: 5
+
+# Max concurrent scan subprocesses
+parallel_scans: 2
+
+# APK corpus (empty = all 8, or list specific names)
+# corpus_subset:
+#   - DIVA
+#   - InsecureBankv2
+#   - TikTok
+
+# Fast proxy mode: use 3-APK subset (DIVA, InsecureBankv2, TikTok)
+fast_proxy: false

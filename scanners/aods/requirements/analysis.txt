@@ -1,0 +1,110 @@
+# AODS Full Analysis Requirements
+# Complete dependencies for all AODS analysis capabilities
+# 
+# This includes base requirements plus advanced analysis tools
+# Use this for full-featured AODS installations
+
+# Include base requirements
+-r base.txt
+
+# ========================================
+# Advanced Dynamic Analysis
+# ========================================
+frida>=16.0.0              # Dynamic instrumentation
+frida-tools>=12.0.0        # Frida CLI tools
+mitmproxy>=11.0.0          # HTTP/HTTPS proxy analysis
+
+# ========================================
+# Advanced Static Analysis
+# ========================================
+pyjadx>=0.4.0              # Java decompiler integration
+yara-python>=4.5.0         # Pattern matching engine
+semgrep>=1.90.0            # Semantic code analysis for MASTG rules
+
+# ========================================
+# Enhanced Data Analysis
+# ========================================
+scipy>=1.14.0              # Scientific computing
+scikit-learn>=1.4.0        # Machine learning for pattern detection
+joblib>=1.3.0              # ML model serialization
+
+# ========================================
+# Advanced Cryptographic Analysis
+# ========================================
+pycryptodome>=3.20.0       # Extended crypto toolkit
+
+# ========================================
+# Network Analysis
+# ========================================
+scapy>=2.6.0               # Network packet manipulation
+dnspython>=2.6.0           # DNS analysis
+
+# ========================================
+# Advanced Reporting
+# ========================================
+matplotlib>=3.8.0          # Visualization
+reportlab>=4.3.0           # PDF generation
+# weasyprint>=62.0.0         # HTML to PDF conversion - removed (HTML generation no longer supported)
+pillow>=11.0.0             # Image processing
+
+# ========================================
+# Enhanced File Processing
+# ========================================
+zipfile36>=0.1.3           # Advanced ZIP handling
+chardet>=5.2.0             # Character encoding detection
+defusedxml>=0.7.1          # Secure XML processing
+
+# ========================================
+# Advanced Text Processing
+# ========================================
+regex>=2024.11.6           # Enhanced regex support
+markupsafe>=2.1.5          # Safe string handling
+
+# ========================================
+# Performance & Profiling
+# ========================================
+memory-profiler>=0.61.0    # Memory profiling
+line-profiler>=4.0.0       # Line profiling
+tqdm>=4.67.0               # Progress bars
+psutil>=6.1.0              # Process and system monitoring
+
+# ========================================
+# Network Security
+# ========================================
+pyopenssl>=25.0.0          # OpenSSL bindings
+certifi>=2025.1.31         # Certificate bundle
+
+# ========================================
+# Enhanced ML/AI (Optional - for improved accuracy)
+# ========================================
+# Deep Learning
+tensorflow>=2.15.0         # Deep learning framework
+torch>=2.2.0               # PyTorch for neural models
+
+# NLP and Embeddings
+sentence-transformers>=2.2.0  # Semantic embeddings for code similarity
+transformers>=4.36.0       # Hugging Face transformers
+
+# Vector Database (Track 14)
+chromadb>=0.4.0            # Embedded vector database for semantic search
+
+# Explainable AI
+shap>=0.44.0               # SHAP explanations for model predictions
+lime>=0.2.0.1              # LIME local interpretable explanations
+
+# Model Calibration
+# Note: calibration-framework removed (does not exist on PyPI)
+netcal>=1.3.0              # Neural network calibration (provides ECE, MCE, temperature scaling)
+
+# ========================================
+# Enhanced False Positive Reduction
+# ========================================
+textdistance>=4.5.0        # String similarity algorithms for FP detection
+python-Levenshtein>=0.21.0 # Optional speedup for textdistance
+publicsuffix2>=2.20191221  # Public suffix list for domain analysis
+tldextract>=3.4.0          # TLD extraction for URL analysis
+validators>=0.20.0         # Data validation utilities
+sortedcontainers>=2.4.0    # Efficient sorted collections
+textblob>=0.18.0           # NLP text analysis for ML vulnerability classifier
+python-magic>=0.4.27       # File type detection for secret/FP analysis
+detect-secrets>=1.4.0      # Secret detection engine (supplements built-in patterns)

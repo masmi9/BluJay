@@ -1,0 +1,53 @@
+# AODS Agent Intelligence Configuration
+# ======================================
+# Controls the optional AI agent system (Tracks 90-99).
+# Disabled by default. Set AODS_AGENT_ENABLED=1 to activate.
+
+enabled: false
+
+# LLM provider: anthropic, openai, ollama
+# Override with AODS_AGENT_PROVIDER env var.
+provider: anthropic
+
+# Custom env var for API key (auto-detected from provider if empty).
+# Override with AODS_AGENT_API_KEY_ENV env var.
+# api_key_env: ""
+
+# Custom base URL for the LLM API (used for Ollama: http://localhost:11434/v1).
+# Override with AODS_AGENT_BASE_URL env var.
+# base_url: ""
+
+# Default model for agent tasks
+model: "claude-sonnet-4-6"
+
+# Global budget limits
+budget:
+  max_iterations: 20         # Max tool-use loop iterations per task
+  max_tokens: 50000          # Max tokens consumed per task
+  max_wall_time_seconds: 300 # 5 minute wall-clock limit per task
+  cost_limit_usd: 1.00      # Global cost cap per task
+
+# Per-agent type overrides (merged with defaults above)
+# NOTE: system_prompt fields are intentionally omitted here - the detailed
+# code-defined prompts in each agent module (triage.py, narration.py, etc.)
+# take priority via _inject_*_prompt().  YAML system_prompt would override
+# them due to config loading order.  Similarly, per-agent model fields are
+# omitted so that the global `model:` field (or AODS_AGENT_MODEL env var)
+# takes effect uniformly.
+agents:
+  narrate:
+    max_iterations: 15
+
+  verify:
+    max_iterations: 25
+
+  triage:
+    max_iterations: 20
+    max_output_tokens: 8192
+
+  remediate:
+    max_iterations: 20
+    max_output_tokens: 8192
+
+  analyze:
+    max_iterations: 20

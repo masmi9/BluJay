@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AODS • UI Readiness Mockup</title>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; font-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'">
+  <meta name="referrer" content="no-referrer" />
+  <!-- Add/extend theme tokens in :root and adopt tokenized typography -->
+  <style>
+    :root {
+      /* Base palette tokens (restored) */
+      --bg: #0b0d12;
+      --surface: #11141a;
+      --surface-2: #171b22;
+      --text: #e6e8ec;
+      --muted: #9aa3af;
+      --accent: #6ea8fe;
+      --wired: #21c55d;
+      --plumb: #f59e0b;
+      --danger: #ef4444;
+      --card-radius: 14px;
+      --shadow: 0 10px 30px rgba(0,0,0,.35);
+
+      /* Brand alias tokens for clarity */
+      --color-background: var(--bg);
+      --color-surface: var(--surface);
+      --color-surface-2: var(--surface-2);
+      --color-text: var(--text);
+      --color-muted: var(--muted);
+      --color-accent: var(--accent);
+      --color-success: var(--wired);
+      --color-warning: var(--plumb);
+      --color-danger: var(--danger);
+      
+      /* Typography tokens */
+      --font-family-base: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Noto Sans", "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      --font-family-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      --font-size-h1: 20px; /* dashboard scale */
+      --font-size-h2: 16px;
+      --font-size-h3: 13px;
+      --font-size-body: 14px;
+      --font-size-small: 12px;
+      --line-height-tight: 1.25;
+      --line-height-body: 1.6;
+      
+      /* Radii and shadows */
+      --radius-sm: 10px;
+      --radius-md: 12px;
+      --radius-lg: 14px;
+      --shadow-sm: 0 4px 16px rgba(0,0,0,.25);
+      --shadow-md: 0 10px 30px rgba(0,0,0,.35);
+      --shadow-lg: 0 14px 44px rgba(0,0,0,.42);
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      background: radial-gradient(1200px 600px at 80% -100px, rgba(110,168,254,.15), transparent) fixed,
+                  radial-gradient(800px 400px at -20% 20%, rgba(33,197,93,.12), transparent) fixed,
+                  var(--bg);
+      color: var(--text);
+      font: 14px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Noto Sans", "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji";
+    }
+    header {
+      position: sticky; top: 0; z-index: 10;
+      background: linear-gradient(180deg, rgba(17,20,26,.92), rgba(17,20,26,.70));
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid #232833;
+    }
+    .topbar {
+      max-width: 1200px; margin: 0 auto; padding: 14px 18px; display: flex; align-items: center; gap: 16px;
+    }
+    .logo { display: flex; align-items: center; gap: 10px; font-weight: 700; letter-spacing: .3px; }
+    .logo svg { width: 24px; height: 24px; }
+    .search {
+      margin-left: auto; display: flex; align-items: center; gap: 8px; background: var(--surface-2); border: 1px solid #272c36; padding: 8px 10px; border-radius: 10px; color: var(--muted);
+    }
+    .wrap { max-width: 1200px; margin: 18px auto; display: grid; grid-template-columns: 260px 1fr; gap: 18px; padding: 0 18px; }
+    nav { position: sticky; top: 72px; align-self: start; }
+    .side {
+      background: var(--surface); border: 1px solid #232833; border-radius: 14px; box-shadow: var(--shadow);
+      padding: 12px;
+    }
+    .side h4 { margin: 8px 10px 6px; color: var(--muted); font-weight: 600; text-transform: uppercase; font-size: 12px; }
+    .side a { display: flex; align-items: center; gap: 8px; padding: 8px 10px; margin: 2px 0; color: var(--text); text-decoration: none; border-radius: 10px; border: 1px solid transparent; }
+    .side a:hover { background: var(--surface-2); border-color: #2a313d; }
+
+    .toolbar { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+    .chip { background: var(--surface-2); color: var(--text); border: 1px solid #2a313d; border-radius: 999px; padding: 8px 12px; cursor: pointer; user-select: none; }
+    .chip[data-active="true"] { background: #1f2632; border-color: var(--accent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 50%, transparent); }
+    .chip:focus { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+
+    main { display: grid; grid-template-columns: 1fr; gap: 14px; }
+    .area { background: var(--surface); border: 1px solid #232833; border-radius: var(--card-radius); box-shadow: var(--shadow); padding: 14px; }
+    .area h2 { margin: 4px 0 10px; font-size: 16px; display: flex; align-items: center; gap: 10px; }
+
+    .badges { display: flex; gap: 8px; margin-bottom: 10px; }
+    .badge { display: inline-flex; align-items: center; gap: 6px; padding: 5px 8px; border-radius: 9px; font-weight: 600; font-size: 12px; letter-spacing: .2px; }
+    .badge svg { width: 14px; height: 14px; }
+    .wired { background: color-mix(in srgb, var(--wired) 18%, transparent); color: #8ef7b8; border: 1px solid color-mix(in srgb, var(--wired) 40%, transparent); }
+    .plumb { background: color-mix(in srgb, var(--plumb) 18%, transparent); color: #ffd386; border: 1px solid color-mix(in srgb, var(--plumb) 40%, transparent); }
+
+    .cols { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .col { background: var(--surface-2); border: 1px solid #272c36; border-radius: 12px; padding: 12px; }
+    .col h3 { margin: 0 0 8px; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .3px; }
+    .list { margin: 0; padding-left: 18px; line-height: 1.6; }
+    .list li { color: #cfd6e3; }
+    .path { color: #97a2b1; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; font-size: 12px; }
+
+    footer { max-width: 1200px; margin: 10px auto 60px; color: var(--muted); padding: 0 18px; }
+
+    @media (max-width: 1040px) { .wrap { grid-template-columns: 1fr; } nav { position: static; } .cols { grid-template-columns: 1fr; } }
+
+    /* Theming and details add-ons */
+    body { font-size: var(--font-size-body); line-height: var(--line-height-body); font-family: var(--font-family-base); }
+    .details { margin-top: 10px; }
+    .details button { background: var(--color-surface-2); border: 1px solid #2a313d; color: var(--color-text); border-radius: var(--radius-sm); padding: 8px 10px; cursor: pointer; }
+    .details button:focus { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+    .panel { display: none; margin-top: 8px; padding: 10px; background: #0f131a; border: 1px solid #272c36; border-radius: var(--radius-sm); }
+    .panel[aria-hidden="false"] { display: block; }
+    pre { margin: 0; max-height: 320px; overflow: auto; }
+    code { font-family: var(--font-family-mono); font-size: var(--font-size-small); color: #dbe5ff; }
+    .path a { color: #9ec1ff; text-decoration: none; border-bottom: 1px dashed rgba(158,193,255,.35); }
+    .path a:hover { color: #cfe0ff; border-bottom-color: rgba(207,224,255,.7); }
+
+    /* Link mode toggle */
+    .mode { display: flex; align-items: center; gap: 8px; }
+    .mode .label { color: var(--muted); font-size: 12px; }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#maincontent" style="position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden;">Skip to main content</a>
+  <header>
+    <div class="topbar">
+      <div class="logo" title="AODS UI Mockup">
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+          <path d="M12 2l8.66 5v10L12 22 3.34 17V7L12 2z" fill="#0e1a2b" stroke="#6ea8fe" stroke-width="1.2"/>
+          <path d="M12 6l5 3v6l-5 3-5-3V9l5-3z" fill="#152235" stroke="#21c55d" stroke-width="1.1"/>
+        </svg>
+        <span>AODS • UI Readiness</span>
+      </div>
+      <div class="mode" id="link-mode" role="group" aria-label="Open links in">
+        <span class="label">Open links in:</span>
+        <div class="chip" data-mode="browser" aria-pressed="false" title="Open via this browser">Browser</div>
+        <div class="chip" data-mode="vscode" aria-pressed="false" title="Open in VSCode editor">VSCode</div>
+      </div>
+      <a href="index.html" class="chip" title="Open Design Gallery">Design Gallery</a>
+
+      <div class="search" role="search" aria-label="Filter">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9aa3af" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <span>Filter by tags below</span>
+      </div>
+      <nav aria-label="Breadcrumb" class="breadcrumb" style="margin-left:8px;color:var(--muted)">
+        <a href="index.html">Design Gallery</a>
+        <span aria-hidden>›</span>
+        <span aria-current="page">Readiness</span>
+      </nav>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <nav>
+      <div class="side" aria-label="Areas">
+        <h4>Areas</h4>
+        <a href="#scan-orch">Scan Orchestration</a>
+        <a href="#plugins">Plugin Management</a>
+        <a href="#ml">ML Components</a>
+        <a href="#enterprise">Enterprise</a>
+        <a href="#evidence">Evidence Storage</a>
+        <a href="#reporting">Reporting</a>
+        <a href="#compliance">Compliance</a>
+        <a href="#perf">Performance</a>
+        <a href="#dyn">Dynamic Analysis UX</a>
+        <a href="#decomp">Decompilation</a>
+        <a href="#pattern">Pattern Governance</a>
+        <a href="#results">Results Explorer</a>
+        <a href="#design">Design System</a>
+      </div>
+    </nav>
+
+    <main id="maincontent">
+      <div class="toolbar" aria-label="Quick filters">
+        <div class="chip" data-chip data-key="all" data-active="true">Show All</div>
+        <div class="chip" data-chip data-key="wired">Only Wired</div>
+        <div class="chip" data-chip data-key="plumb">Only Needs Plumbing</div>
+      </div>
+
+      <!-- 1. Scan Orchestration -->
+      <section id="scan-orch" class="area" data-area>
+        <h2>
+          <span>Scan Orchestration</span>
+        </h2>
+        <div class="badges">
+          <span class="badge wired">✅ Wired</span>
+          <span class="badge plumb">⚠️ Needs Plumbing</span>
+        </div>
+        <div class="cols">
+          <div class="col" data-kind="wired">
+            <h3>Wired in code</h3>
+            <ul class="list">
+              <li>Execution and orchestration present <span class="path">core/analyzer.py, core/execution/</span></li>
+              <li>Scan profiles and unified config <span class="path">core/scan_profiles.py, core/unified_config.py</span></li>
+            </ul>
+          </div>
+          <div class="col" data-kind="plumb">
+            <h3>Needs plumbing</h3>
+            <ul class="list">
+              <li>UI run controls, status stream, cancel/resume actions</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. Plugin Management -->
+      <section id="plugins" class="area" data-area>
+        <h2>Plugin Management</h2>
+        <div class="badges"><span class="badge wired">✅ Wired</span><span class="badge plumb">⚠️ Needs Plumbing</span></div>
+        <div class="cols">
+          <div class="col" data-kind="wired">
+            <h3>Wired in code</h3>
+            <ul class="list">
+              <li>Unified registry and managers <span class="path">core/plugins/</span></li>
+              <li>Rich plugin catalog <span class="path">plugins/</span></li>
+            </ul>
+          </div>
+          <div class="col" data-kind="plumb">
+            <h3>Needs plumbing</h3>
+            <ul class="list">
+              <li>Enable/disable UI, compatibility warnings, perf hints</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. ML Components -->
+      <section id="ml" class="area" data-area>
+        <h2>ML Components</h2>
+        <div class="badges"><span class="badge wired">✅ Wired</span><span class="badge plumb">⚠️ Needs Plumbing</span></div>
+        <div class="cols">
+          <div class="col" data-kind="wired">
+            <h3>Wired in code</h3>
+            <ul class="list">
+              <li>Model suites and feedback loops <span class="path">models/, data/user_feedback.db</span></li>
+            </ul>
+          </div>
+          <div class="col" data-kind="plumb">
+            <h3>Needs plumbing</h3>
+            <ul class="list">
+              <li>Confidence sliders, FP review queue UI</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. Enterprise -->
+      <section id="enterprise" class="area" data-area>
+        <h2>Enterprise</h2>
+        <div class="badges"><span class="badge wired">✅ Wired</span><span class="badge plumb">⚠️ Needs Plumbing</span></div>
+        <div class="cols">
+          <div class="col" data-kind="wired">
+            <h3>Wired in code</h3>
+            <ul class="list">
+              <li>RBAC, integrations, batch CLI <span class="path">core/enterprise/</span></li>
+            </ul>
+          </div>
+          <div class="col" data-kind="plumb">
+            <h3>Needs plumbing</h3>
+            <ul class="list">
+              <li>Tenant-aware UI, roles matrix, integration setup</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- 5. Evidence Storage -->
+      <section id="evidence" class="area" data-area>
+        <h2>Evidence Storage</h2>
+        <div class="badges"><span class="badge wired">✅ Wired (partial)</span><span class="badge plumb">⚠️ Needs Plumbing</span></div>
+        <div class="cols">
+          <div class="col" data-kind="wired">
+            <h3>Wired in code</h3>
+            <ul class="list">
+              <li>Runtime collectors, verification tooling <span class="path">core/dynamic_analysis/, verify_evidence.py</span></li>
+            </ul>
+          </div>
+          <div class="col" data-kind="plumb">
+            <h3>Needs plumbing</h3>
+            <ul class="list">
+              <li>Evidence DB, viewer, lifecycle, retention policies</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- 6. Reporting -->
+      <section id="reporting" class="area" data-area>
+        <h2>Reporting</h2>
+        <div class="badges"><span class="badge wired">✅ Wired (core)</span><span class="badge plumb">⚠️ Needs Plumbing</span></div>
+        <div class="cols">
+          <div class="col" data-kind="wired">
+            <h3>Wired in code</h3>
+            <ul class="list">
+              <li>Unified engine, summaries, mapping <span class="path">core/reporting/</span></li>
+            </ul>
+          </div>
+          <div class="col" data-kind="plumb">
+            <h3>Needs plumbing</h3>
+            <ul class="list">
+              <li>Report designer UI, export (PDF/HTML), sign & encrypt</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- 7. Compliance -->
+      <section id="compliance" class="area" data-area>
+        <h2>Compliance</h2>
+        <div class="badges"><span class="badge wired">✅ Wired (skeleton)</span><span class="badge plumb">⚠️ Needs Plumbing</span></div>
+        <div class="cols">
+          <div class="col" data-kind="wired">
+            <h3>Wired in code</h3>
+            <ul class="list">
+              <li>Framework mapper scaffolding <span class="path">core/reporting/security_framework_mapper.py</span></li>
+            </ul>
+          </div>
+          <div class="col" data-kind="plumb">
+            <h3>Needs plumbing</h3>
+            <ul class="list">
+              <li>Control matrix UI, coverage heatmaps, evidence linkage</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- 8. Performance -->
+      <section id="perf" class="area" data-area>
+        <h2>Performance Monitoring</h2>
+        <div class="badges"><span class="badge wired">✅ Wired (hooks)</span><span class="badge plumb">⚠️ Needs Plumbing</span></div>
+        <div class="cols">
+          <div class="col" data-kind="wired">
+            <h3>Wired in code</h3>
+            <ul class="list">
+              <li>Hooks & collectors <span class="path">core/plugins/enhanced_performance_metrics.py</span></li>
+            </ul>
+          </div>
+          <div class="col" data-kind="plumb">
+            <h3>Needs plumbing</h3>
+            <ul class="list">
+              <li>Perf dashboard, plugin runtime charts, alerts</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- 9. Dynamic Analysis UX -->
+      <section id="dyn" class="area" data-area>
+        <h2>Dynamic Analysis UX</h2>
+        <div class="badges"><span class="badge wired">✅ Wired (assertion engine)</span><span class="badge plumb">⚠️ Needs Plumbing</span></div>
+        <div class="cols">
+          <div class="col" data-kind="wired">
+            <h3>Wired in code</h3>
+            <ul class="list">
+              <li>Behavioral assertions & evidence <span class="path">core/dynamic_analysis/</span></li>
+            </ul>
+          </div>
+          <div class="col" data-kind="plumb">
+            <h3>Needs plumbing</h3>
+            <ul class="list">
+              <li>Run controls, live logs, session snapshots</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- 10. Decompilation -->
+      <section id="decomp" class="area" data-area>
+        <h2>Decompilation</h2>
+        <div class="badges"><span class="badge wired">✅ Wired (validators)</span><span class="badge plumb">⚠️ Needs Plumbing</span></div>
+        <div class="cols">
+          <div class="col" data-kind="wired">
+            <h3>Wired in code</h3>
+            <ul class="list">
+              <li>Completeness validator <span class="path">core/decompilation/</span></li>
+            </ul>
+          </div>
+          <div class="col" data-kind="plumb">
+            <h3>Needs plumbing</h3>
+            <ul class="list">
+              <li>Decompile job queue UI, source viewer</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- 11. Pattern Governance -->
+      <section id="pattern" class="area" data-area>
+        <h2>Pattern Governance</h2>
+        <div class="badges"><span class="badge wired">✅ Wired (validators)</span><span class="badge plumb">⚠️ Needs Plumbing</span></div>
+        <div class="cols">
+          <div class="col" data-kind="wired">
+            <h3>Wired in code</h3>
+            <ul class="list">
+              <li>Context validator <span class="path">core/pattern_governance/</span></li>
+            </ul>
+          </div>
+          <div class="col" data-kind="plumb">
+            <h3>Needs plumbing</h3>
+            <ul class="list">
+              <li>Pattern library UI, rule testing, promotion workflow</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- 12. Results Explorer -->
+      <section id="results" class="area" data-area>
+        <h2>Results Explorer</h2>
+        <div class="badges"><span class="badge wired">✅ Wired (files exist)</span><span class="badge plumb">⚠️ Needs Plumbing</span></div>
+        <div class="cols">
+          <div class="col" data-kind="wired">
+            <h3>Wired in code</h3>
+            <ul class="list">
+              <li>Results/log artifacts <span class="path">scan_results/, results/recent_scans/</span></li>
+            </ul>
+          </div>
+          <div class="col" data-kind="plumb">
+            <h3>Needs plumbing</h3>
+            <ul class="list">
+              <li>Runs list, filters, diff across scans, drill-down</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- 13. Design System -->
+      <section id="design" class="area" data-area>
+        <h2>Design System</h2>
+        <div class="badges"><span class="badge wired">✅ Wired (assets)</span><span class="badge plumb">⚠️ Needs Plumbing</span></div>
+        <div class="cols">
+          <div class="col" data-kind="wired">
+            <h3>Wired in code</h3>
+            <ul class="list">
+              <li>MD3 assets present <span class="path">design/ui/*.svg</span></li>
+            </ul>
+          </div>
+          <div class="col" data-kind="plumb">
+            <h3>Needs plumbing</h3>
+            <ul class="list">
+              <li>Tokenized theme, reusable components, MD3 mapping</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <footer>
+    Legend: ✅ Wired indicates code present in repo. ⚠️ Needs Plumbing indicates UI work needed to connect to code paths.
+  </footer>
+
+  <script>
+    // Simple filter chips
+    const chips = document.querySelectorAll('[data-chip]');
+    const areas = document.querySelectorAll('[data-area]');
+    chips.forEach(ch => {
+      ch.setAttribute('role', 'button');
+      ch.setAttribute('tabindex', '0');
+      ch.addEventListener('click', () => {
+        chips.forEach(c => c.dataset.active = 'false');
+        ch.dataset.active = 'true';
+        const key = ch.dataset.key;
+        areas.forEach(a => {
+          if (key === 'all') { a.style.display = ''; return; }
+          const showWired = key === 'wired';
+          const wiredBox = a.querySelector('[data-kind="wired"]');
+          const plumbBox = a.querySelector('[data-kind="plumb"]');
+          const has = showWired ? wiredBox : plumbBox;
+          a.style.display = has ? '' : 'none';
+        });
+      });
+      ch.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          ch.click();
+        }
+      });
+    });
+
+    // Link mode + path rendering
+    const MODE_KEY = 'aodsLinkMode';
+    let linkMode = localStorage.getItem(MODE_KEY) || 'vscode'; // default to VSCode
+
+    // Runtime UI configuration with graceful fallback
+    let uiConfig = {
+      environment: 'development',
+      webBasePath: '/',
+      workspaceRoot: '/home/kali/ONDEFEND/AODS/aods/automated-owasp-dynamic-scan-dyna_update',
+      vscodeScheme: 'vscode://file',
+      defaultLinkMode: 'browser'
+    };
+
+    async function loadUIConfig() {
+      try {
+        const resp = await fetch('/config/ui-config.json', { cache: 'no-store' });
+        if (resp.ok) {
+          const cfg = await resp.json();
+          uiConfig = Object.assign({}, uiConfig, cfg || {});
+        }
+      } catch (e) {
+        // Fallback silently when not served via HTTP
+      } finally {
+        if (!localStorage.getItem(MODE_KEY) && uiConfig.defaultLinkMode) {
+          linkMode = uiConfig.defaultLinkMode;
+        }
+      }
+    }
+
+    const modeChips = document.querySelectorAll('#link-mode [data-mode]');
+    function updateModeUI() {
+      modeChips.forEach(btn => {
+        const active = btn.dataset.mode === linkMode;
+        btn.dataset.active = String(active);
+        btn.setAttribute('aria-pressed', String(active));
+        btn.setAttribute('role', 'button');
+        btn.setAttribute('tabindex', '0');
+      });
+    }
+
+    function normalizeRel(relIn) {
+      let rel = relIn.replace(/^\/*/, '');
+      if (rel.includes('*')) {
+        const folder = rel.split('*')[0];
+        rel = folder.endsWith('/') ? folder : (folder + '/');
+      }
+      return rel;
+    }
+
+    function isSafeRelPath(p) {
+      if (!p || typeof p !== 'string') return false;
+      if (p.includes('..') || p.includes('://') || p.startsWith('javascript:')) return false;
+      // Allow letters, numbers, underscore, dash, dot, slash and spaces
+      return /^[A-Za-z0-9_./\-\s]+$/.test(p);
+    }
+
+    function hrefFor(relIn) {
+      const rel = normalizeRel(relIn);
+      if (!isSafeRelPath(rel)) return '#';
+      if (linkMode === 'vscode') {
+        const base = uiConfig.vscodeScheme.endsWith(':') ? (uiConfig.vscodeScheme + '//file') : uiConfig.vscodeScheme;
+        const ws = uiConfig.workspaceRoot.replace(/\/$/, '');
+        return base + '/' + ws + '/' + rel;
+      } else {
+        const base = (uiConfig.webBasePath || '/').replace(/\/$/, '');
+        const noLead = rel.replace(/^\/*/, '');
+        return base + '/' + noLead;
+      }
+    }
+
+    function renderPathSpan(span) {
+      let raw = span.dataset.raw;
+      if (!raw || !raw.trim()) {
+        const anchors = Array.from(span.querySelectorAll('a'));
+        if (anchors.length) {
+          raw = anchors.map(a => a.textContent.trim()).filter(Boolean).join(', ');
+        } else {
+          raw = span.textContent.trim();
+        }
+        span.dataset.raw = raw;
+      }
+      const parts = raw.split(',').map(s => s.trim()).filter(Boolean);
+      const frag = document.createDocumentFragment();
+      parts.forEach((p, idx) => {
+        const safe = isSafeRelPath(p);
+        const a = document.createElement('a');
+        a.textContent = p;
+        if (safe) {
+          a.setAttribute('href', hrefFor(p));
+        } else {
+          a.setAttribute('href', '#');
+          a.setAttribute('aria-disabled', 'true');
+        }
+        frag.appendChild(a);
+        if (idx < parts.length - 1) frag.appendChild(document.createTextNode(', '));
+      });
+      while (span.firstChild) span.removeChild(span.firstChild);
+      span.appendChild(frag);
+    }
+
+    function renderAllPathSpans() {
+      document.querySelectorAll('.list .path').forEach(renderPathSpan);
+    }
+
+    modeChips.forEach(btn => {
+      btn.addEventListener('click', () => {
+        linkMode = btn.dataset.mode;
+        localStorage.setItem(MODE_KEY, linkMode);
+        updateModeUI();
+        renderAllPathSpans();
+      });
+      btn.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          btn.click();
+        }
+      });
+    });
+
+    (async function init() {
+      await loadUIConfig();
+      updateModeUI();
+      renderAllPathSpans();
+    })();
+
+    // Accessible expandable panels with sample JSON payloads (camelCase, ISO-8601 UTC)
+    function addDetails(sectionSelector, title, json) {
+      const sec = document.querySelector(sectionSelector);
+      if (!sec) return;
+      const wrap = document.createElement('div');
+      wrap.className = 'details';
+
+      const btn = document.createElement('button');
+      const panelId = sectionSelector.replace('#','') + '-panel';
+      btn.type = 'button';
+      btn.setAttribute('aria-expanded', 'false');
+      btn.setAttribute('aria-controls', panelId);
+      btn.textContent = title;
+
+      const panel = document.createElement('div');
+      panel.className = 'panel';
+      panel.id = panelId;
+      panel.setAttribute('aria-hidden', 'true');
+      panel.setAttribute('role', 'region');
+
+      const pre = document.createElement('pre');
+      const code = document.createElement('code');
+      code.textContent = JSON.stringify(json, null, 2);
+      pre.appendChild(code);
+      panel.appendChild(pre);
+
+      btn.addEventListener('click', () => {
+        const open = btn.getAttribute('aria-expanded') === 'true';
+        btn.setAttribute('aria-expanded', String(!open));
+        panel.setAttribute('aria-hidden', String(open));
+      });
+
+      wrap.appendChild(btn);
+      wrap.appendChild(panel);
+
+      // Append after the badges for better hierarchy
+      const badges = sec.querySelector('.badges');
+      (badges ? badges : sec).appendChild(wrap);
+    }
+
+    // Sample payloads
+    addDetails('#scan-orch', 'View Sample Run JSON', {
+      id: 'run_2025_09_18_001',
+      profile: 'OWASP_Mobile_Full',
+      target: { appId: 'com.example.app', version: '2.3.1' },
+      plugins: ['advanced_ssl_tls_analyzer','deeplink_analysis'],
+      status: 'running',
+      startedAt: '2025-09-18T09:12:42Z',
+      stats: { findings: 0, warnings: 3, errors: 0, durationMs: 12450 }
+    });
+
+    addDetails('#evidence', 'View Sample Evidence JSON', {
+      id: 'ev_9fa2',
+      runId: 'run_2025_09_18_001',
+      type: 'network_trace',
+      source: 'dynamic_analysis',
+      path: 'data/runtime_evidence/run_2025_09_18_001/nettrace_01.pcap',
+      hash: 'sha256:<digest>',
+      meta: { host: 'api.example.com', method: 'POST', status: 200 }
+    });
+
+    addDetails('#perf', 'View Sample Performance Metric JSON', {
+      id: 'm_aa11',
+      runId: 'run_2025_09_18_001',
+      plugin: 'deeplink_analysis',
+      durationMs: 842,
+      cpuAvg: 23.5,
+      memMb: 128.4,
+      status: 'ok',
+      ts: '2025-09-18T09:13:02Z'
+    });
+
+    addDetails('#compliance', 'View Sample Compliance Mapping JSON', {
+      controlId: 'MSTG-NETWORK-1',
+      framework: 'MSTG',
+      coveredByPlugins: ['advanced_ssl_tls_analyzer'],
+      evidenceIds: ['ev_9fa2'],
+      status: 'partially_covered'
+    });
+  </script>
+</body>
+</html>

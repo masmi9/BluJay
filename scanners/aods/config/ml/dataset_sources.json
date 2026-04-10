@@ -1,0 +1,171 @@
+{
+  "sources": [
+    {
+      "name": "DroidBench",
+      "type": "git",
+      "url": "https://github.com/secure-software-engineering/DroidBench.git",
+      "subdir": "droidbench",
+      "include_ext": [".apk", ".java"],
+      "description": "Android taint-analysis benchmark suite with categorized vulnerable patterns"
+    },
+    {
+      "name": "Ghera",
+      "type": "git",
+      "url": "https://github.com/secure-software-engineering/Ghera.git",
+      "subdir": "ghera",
+      "include_ext": [".apk", ".java"],
+      "description": "25 paired vulnerable/benign Android apps"
+    },
+    {
+      "name": "LVDAndro",
+      "type": "git",
+      "url": "https://github.com/softwaresec-labs/LVDAndro.git",
+      "subdir": "lvdandro",
+      "include_ext": [".java", ".kt", ".json"],
+      "description": "CWE-annotated Android source code vulnerability datasets"
+    },
+    {
+      "name": "D2A",
+      "type": "git",
+      "url": "https://github.com/IBM/D2A.git",
+      "subdir": "d2a",
+      "include_ext": [".json", ".csv", ".py"],
+      "description": "Static analysis true/false positive dataset for FP reduction training"
+    },
+    {
+      "name": "CVEfixes",
+      "type": "git",
+      "url": "https://github.com/secureIT-project/CVEfixes.git",
+      "subdir": "cvefixes",
+      "include_ext": [".db", ".csv", ".json", ".sql"],
+      "description": "CVE-to-fix dataset with 12,107 fix commits and 11,873 CVEs"
+    },
+    {
+      "name": "OWApp",
+      "type": "git",
+      "url": "https://github.com/Mobile-IoT-Security-Lab/OWApp-Benchmarking-Suite.git",
+      "subdir": "owapp",
+      "include_ext": [".apk", ".json"],
+      "description": "Framework for benchmarking mobile security tools"
+    },
+    {
+      "name": "DiverseVul",
+      "type": "git",
+      "url": "https://github.com/wagner-group/diversevul.git",
+      "subdir": "diversevul",
+      "include_ext": [".json", ".csv", ".py"],
+      "description": "Dataset of 349K vulnerable/non-vulnerable functions"
+    },
+    {
+      "name": "MH-1M",
+      "type": "git",
+      "url": "https://github.com/Malware-Hunter/MH-1M.git",
+      "subdir": "mh1m",
+      "include_ext": [".csv", ".json", ".py", ".parquet"],
+      "description": "1.34M Android malware samples with rich metadata (2025). Full data at Harvard Dataverse.",
+      "data_urls": {
+        "github": "https://github.com/Malware-Hunter/MH-1M",
+        "figshare": "https://figshare.com/articles/dataset/MH-1M_Dataset/28355897",
+        "harvard_dataverse": "https://doi.org/10.7910/DVN/LLHEGN"
+      },
+      "notes": "GitHub has metadata/code. Full 400GB+ dataset at Harvard Dataverse."
+    },
+    {
+      "name": "Drebin",
+      "type": "manual",
+      "url": "https://www.sec.tu-bs.de/~danarp/drebin/",
+      "subdir": "drebin",
+      "include_ext": [".apk", ".csv", ".txt"],
+      "description": "5,560 malware samples from 179 families (2010-2012). Classic benchmark dataset.",
+      "access": "Request access via website form",
+      "samples": 5560,
+      "families": 179
+    },
+    {
+      "name": "AMD",
+      "type": "manual",
+      "url": "http://amd.arguslab.org",
+      "subdir": "amd",
+      "include_ext": [".apk"],
+      "description": "Android Malware Dataset: 24,553 samples across 135 varieties and 71 families (2010-2016)",
+      "access": "Registration required at amd.arguslab.org",
+      "samples": 24553,
+      "families": 71
+    },
+    {
+      "name": "PRAGuard",
+      "type": "manual",
+      "url": "http://pralab.diee.unica.it/en/AndroidPRAGuardDataset",
+      "subdir": "praguard",
+      "include_ext": [".apk"],
+      "description": "10,479 obfuscated malware samples from MalGenome and Contagio. Tests evasion resistance.",
+      "access": "Download from PRALab website",
+      "samples": 10479,
+      "obfuscation_techniques": ["trivial", "string_encryption", "reflection", "class_encryption"]
+    },
+    {
+      "name": "Kharon",
+      "type": "git",
+      "url": "https://gitlab.inria.fr/music/music-data/kharon-dataset.git",
+      "subdir": "kharon",
+      "include_ext": [".apk", ".json", ".md"],
+      "description": "Reversed and documented malware for research evaluation. Includes analysis notes.",
+      "access": "Public GitLab repository"
+    },
+    {
+      "name": "AndroMalShare",
+      "type": "manual",
+      "url": "http://sanddroid.xjtu.edu.cn:8080/",
+      "subdir": "andromalshare",
+      "include_ext": [".apk"],
+      "description": "Research malware sharing platform. Upload/download with registration.",
+      "access": "Registration required for research use"
+    },
+    {
+      "name": "CICMalDroid",
+      "type": "manual",
+      "url": "https://www.unb.ca/cic/datasets/maldroid-2020.html",
+      "subdir": "cicmaldroid",
+      "include_ext": [".apk", ".csv"],
+      "description": "CIC Android Malware Dataset 2020. Includes adware, banking, SMS, riskware categories.",
+      "access": "Download from CIC website",
+      "categories": ["adware", "banking", "sms_malware", "riskware", "benign"]
+    }
+  ],
+  "metadata": {
+    "phase_1_vulnerability": {
+      "datasets": ["DroidBench", "Ghera", "LVDAndro", "D2A", "CVEfixes"],
+      "description": "Vulnerability detection training - expert-curated labels",
+      "total_samples": "25,000+"
+    },
+    "phase_2_expanded": {
+      "datasets": ["OWApp", "DiverseVul"],
+      "description": "Large-scale function-level training",
+      "total_samples": "350,000+"
+    },
+    "phase_3_malware": {
+      "datasets": ["MH-1M", "Drebin", "AMD", "PRAGuard", "Kharon", "CICMalDroid"],
+      "description": "Malware detection and classification training",
+      "total_samples": "1,400,000+",
+      "notes": "MH-1M is the largest and most recent (2025)"
+    },
+    "phase_4_optional": {
+      "datasets": ["AndroZoo", "AndroMalShare"],
+      "description": "Massive scale datasets requiring registration/API keys",
+      "total_samples": "15,000,000+",
+      "access_notes": {
+        "AndroZoo": "API key required - https://androzoo.uni.lu/access",
+        "AndroMalShare": "Research registration required"
+      }
+    }
+  },
+  "recommended_order": [
+    "DroidBench",
+    "D2A",
+    "MH-1M",
+    "Drebin",
+    "AMD",
+    "DiverseVul"
+  ],
+  "total_potential_samples": "1,800,000+"
+}

@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AODS MD3 UI Mockups</title>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; font-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'">
+  <meta name="referrer" content="no-referrer" />
+  <style>
+    :root {
+      --bg: #0b0c0f;
+      --card: #111318;
+      --text: #e3e6eb;
+      --muted: #aeb4bf;
+      --accent: #86b6ff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; padding: 24px; background: var(--bg); color: var(--text);
+      font-family: Inter, Roboto, system-ui, -apple-system, Segoe UI, Arial, sans-serif;
+    }
+    header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; gap: 16px; flex-wrap: wrap; }
+    h1 { font-size: 20px; margin: 0; letter-spacing: 0.3px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 24px; }
+    .tile { background: var(--card); border: 1px solid #1a1d24; border-radius: 16px; padding: 16px; }
+    .tile h2 { font-size: 14px; font-weight: 600; margin: 0 0 12px; color: var(--muted); }
+    .thumb { width: 100%; border-radius: 12px; background: #0d1117; border: 1px solid #22262f; }
+    a { color: var(--accent); text-decoration: none; }
+    .legend { margin-top: 8px; font-size: 12px; color: var(--muted); display: flex; gap: 12px; flex-wrap: wrap; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .toolbar { display: flex; align-items: center; gap: 8px; }
+    button { background: #0f1116; border: 1px solid #22262f; color: var(--text); padding: 8px 12px; border-radius: 10px; cursor: pointer; }
+    button:hover { background: #141821; }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#maincontent" style="position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden;">Skip to main content</a>
+  <header>
+    <h1>AODS - Material Design 3 High-Fidelity Mockups</h1>
+    <div class="toolbar">
+      <a href="#dark">Dark</a>
+      <span aria-hidden>·</span>
+      <a href="#light">Light</a>
+      <span aria-hidden>·</span>
+      <a href="#states">Component States</a>
+      <span aria-hidden>·</span>
+      <a href="#responsive">Responsive</a>
+      <span aria-hidden>·</span>
+      <a href="mockup_ui.html">Interactive Readiness Mockup</a>
+      <span aria-hidden>·</span>
+      <a href="react-app/index.html">React App</a>
+    </div>
+    <div class="legend">
+      <span>Desktop 1440×1024 • Mobile 375×812</span>
+      <span>MD3 shells: App bar + Nav drawer</span>
+      <span>Click image to open full SVG</span>
+    </div>
+  </header>
+
+  <main id="maincontent">
+  <section id="dark" class="grid">
+    <div class="tile"><h2>Dashboard</h2><a href="MD3_Dashboard.svg" target="_blank" rel="noopener noreferrer"><img class="thumb" src="MD3_Dashboard.svg" alt="Dashboard mockup" /></a></div>
+    <div class="tile"><h2>Scans</h2><a href="MD3_Scans.svg" target="_blank" rel="noopener noreferrer"><img class="thumb" src="MD3_Scans.svg" alt="Scans mockup" /></a></div>
+    <div class="tile"><h2>Results Explorer</h2><a href="MD3_Results_Explorer.svg" target="_blank" rel="noopener noreferrer"><img class="thumb" src="MD3_Results_Explorer.svg" alt="Results Explorer mockup" /></a></div>
+    <div class="tile"><h2>Vulnerability Details</h2><a href="MD3_Vulnerability_Details.svg" target="_blank" rel="noopener noreferrer"><img class="thumb" src="MD3_Vulnerability_Details.svg" alt="Vulnerability Details mockup" /></a></div>
+    <div class="tile"><h2>Scan Runner (Wizard)</h2><a href="MD3_Scan_Runner.svg" target="_blank" rel="noopener noreferrer"><img class="thumb" src="MD3_Scan_Runner.svg" alt="Scan Runner mockup" /></a></div>
+    <div class="tile"><h2>Reports</h2><a href="MD3_Reports.svg" target="_blank" rel="noopener noreferrer"><img class="thumb" src="MD3_Reports.svg" alt="Reports mockup" /></a></div>
+    <div class="tile"><h2>Policies</h2><a href="MD3_Policies.svg" target="_blank" rel="noopener noreferrer"><img class="thumb" src="MD3_Policies.svg" alt="Policies mockup" /></a></div>
+    <div class="tile"><h2>Settings</h2><a href="MD3_Settings.svg?v=2" target="_blank" rel="noopener noreferrer"><img class="thumb" src="MD3_Settings.svg?v=2" alt="Settings mockup" /></a></div>
+    <div class="tile"><h2>Playbooks</h2><a href="MD3_Playbooks.svg?v=2" target="_blank" rel="noopener noreferrer"><img class="thumb" src="MD3_Playbooks.svg?v=2" alt="Playbooks mockup" /></a></div>
+    <div class="tile"><h2>Audit Log</h2><a href="MD3_Audit_Log.svg?v=2" target="_blank" rel="noopener noreferrer"><img class="thumb" src="MD3_Audit_Log.svg?v=2" alt="Audit Log mockup" /></a></div>
+    <div class="tile"><h2>Help & Docs</h2><a href="MD3_Help_Docs.svg?v=2" target="_blank" rel="noopener noreferrer"><img class="thumb" src="MD3_Help_Docs.svg?v=2" alt="Help & Docs mockup" /></a></div>
+    <div class="tile"><h2>Admin Console</h2><a href="MD3_Admin_Console.svg?v=2" target="_blank" rel="noopener noreferrer"><img class="thumb" src="MD3_Admin_Console.svg?v=2" alt="Admin Console mockup" /></a></div>
+  </section>
+
+  <section id="states" style="margin-top:32px;">
+    <h2 style="font: 600 14px/1 Inter, Roboto, sans-serif; color: var(--muted); margin: 0 0 12px;">Component States</h2>
+    <div class="tile">
+      <a href="MD3_Component_States.svg" target="_blank" rel="noopener noreferrer">
+        <img class="thumb" src="MD3_Component_States.svg" alt="Component interactive states board" />
+      </a>
+    </div>
+  </section>
+
+  <section id="responsive" style="margin-top:32px;" class="grid">
+    <div class="tile"><h2>Scans - Mobile (375×812)</h2><a href="MD3_Scans_Mobile.svg" target="_blank" rel="noopener noreferrer"><img class="thumb" src="MD3_Scans_Mobile.svg" alt="Scans mobile mockup" /></a></div>
+  </section>
+
+  <section id="light" style="margin-top:32px;">
+    <h2 style="font: 600 14px/1 Inter, Roboto, sans-serif; color: var(--muted); margin: 0 0 12px;">Light Theme</h2>
+    <div class="grid">
+      <div class="tile"><h2>Dashboard - Light</h2><a href="MD3_Dashboard_Light.svg" target="_blank" rel="noopener noreferrer"><img class="thumb" src="MD3_Dashboard_Light.svg" alt="Dashboard light mockup" /></a></div>
+    </div>
+  </section>
+  </main>
+</body>
+</html>

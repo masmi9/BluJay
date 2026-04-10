@@ -1,0 +1,237 @@
+improper_platform_usage:
+  action: Properly configure platform security features and validate API usage
+  fix_example: "// BEFORE (Vulnerable): Exported component without proper permissions\n<activity android:name=\".MainActivity\"\
+    \ android:exported=\"true\" />\n\n// AFTER (Secure): Add proper permissions and intent filters\n<activity android:name=\"\
+    .MainActivity\" \n          android:exported=\"true\"\n          android:permission=\"com.example.CUSTOM_PERMISSION\"\
+    >\n    <intent-filter>\n        <action android:name=\"android.intent.action.MAIN\" />\n        <category android:name=\"\
+    android.intent.category.LAUNCHER\" />\n    </intent-filter>\n</activity>\n\n// Define custom permission\n<permission android:name=\"\
+    com.example.CUSTOM_PERMISSION\"\n            android:protectionLevel=\"signature\" />"
+  apis:
+  - Custom Permissions
+  - Intent Filters
+  - Component Protection
+insecure_data_storage:
+  action: Implement secure data storage using encryption and proper access controls
+  fix_example: '// BEFORE (Vulnerable): Plain text storage
+
+    SharedPreferences prefs = getSharedPreferences("data", MODE_WORLD_READABLE);
+
+    prefs.edit().putString("password", plainPassword).commit();
+
+
+    // AFTER (Secure): Encrypted storage with proper mode
+
+    // Use Android Keystore for key management
+
+    SharedPreferences prefs = getSharedPreferences("data", MODE_PRIVATE);
+
+    String encryptedPassword = EncryptionUtil.encrypt(plainPassword);
+
+    prefs.edit().putString("password", encryptedPassword).commit();
+
+
+    // For sensitive data, use Android Keystore:
+
+    KeyStore keyStore = KeyStore.getInstance("AndroidKeyStore");
+
+    keyStore.load(null);'
+  apis:
+  - EncryptionUtil
+  - AndroidKeyStore
+  - MODE_PRIVATE
+insecure_communication:
+  action: Implement secure network communication with proper TLS configuration
+  fix_example: "// BEFORE (Vulnerable): HTTP cleartext traffic\nURL url = new URL(\"http://api.example.com/data\");\nHttpURLConnection\
+    \ conn = (HttpURLConnection) url.openConnection();\n\n// AFTER (Secure): HTTPS with certificate pinning\nURL url = new\
+    \ URL(\"https://api.example.com/data\");\nHttpsURLConnection conn = (HttpsURLConnection) url.openConnection();\n\n// Implement\
+    \ certificate pinning\nCertificatePinner certificatePinner = new CertificatePinner.Builder()\n    .add(\"api.example.com\"\
+    , \"sha256/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\")\n    .build();\n\n// In AndroidManifest.xml:\n<application\
+    \ android:usesCleartextTraffic=\"false\">\n    <meta-data android:name=\"android.security.NET_CONFIG\" \n            \
+    \   android:resource=\"@xml/network_security_config\" />\n</application>"
+  apis:
+  - HttpsURLConnection
+  - CertificatePinner
+  - NetworkSecurityConfig
+insecure_authentication:
+  action: Implement strong authentication mechanisms with proper session management
+  fix_example: "// BEFORE (Vulnerable): Weak password validation\nif (password.length() > 4) { return true; }\n\n// AFTER\
+    \ (Secure): Strong authentication with biometrics\n// Use Android Biometric API\nBiometricPrompt biometricPrompt = new\
+    \ BiometricPrompt(this, \n    ContextCompat.getMainExecutor(this), new AuthenticationCallback());\n\nBiometricPrompt.PromptInfo\
+    \ promptInfo = new BiometricPrompt.PromptInfo.Builder()\n    .setTitle(\"Biometric Authentication\")\n    .setSubtitle(\"\
+    Use your fingerprint to authenticate\")\n    .setNegativeButtonText(\"Cancel\")\n    .build();\n\n// For password validation\n\
+    private boolean isStrongPassword(String password) {\n    return password.length() >= 12 && \n           password.matches(\"\
+    .*[A-Z].*\") && \n           password.matches(\".*[a-z].*\") && \n           password.matches(\".*\\\\d.*\") && \n   \
+    \        password.matches(\".*[!@#$%^&*].*\");\n}"
+  apis:
+  - BiometricPrompt
+  - PasswordPolicy
+  - SecureRandom
+insufficient_cryptography:
+  action: Use strong cryptographic algorithms and proper key management
+  fix_example: "// BEFORE (Vulnerable): Weak encryption\nCipher cipher = Cipher.getInstance(\"DES\");\nMessageDigest md =\
+    \ MessageDigest.getInstance(\"MD5\");\n\n// AFTER (Secure): Strong encryption with AES-GCM\n// Use Android Keystore for\
+    \ key generation\nKeyGenerator keyGen = KeyGenerator.getInstance(\"AES\", \"AndroidKeyStore\");\nKeyGenParameterSpec keyGenSpec\
+    \ = new KeyGenParameterSpec.Builder(\"MySecretKey\",\n    KeyProperties.PURPOSE_ENCRYPT | KeyProperties.PURPOSE_DECRYPT)\n\
+    \    .setBlockModes(KeyProperties.BLOCK_MODE_GCM)\n    .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)\n\
+    \    .setKeySize(256)\n    .build();\nkeyGen.init(keyGenSpec);\nSecretKey secretKey = keyGen.generateKey();\n\n// For\
+    \ hashing, use SHA-256 or better\nMessageDigest md = MessageDigest.getInstance(\"SHA-256\");"
+  apis:
+  - AES/GCM/NoPadding
+  - AndroidKeyStore
+  - SHA-256
+insecure_authorization:
+  action: Implement proper access control and authorization checks
+  fix_example: "// BEFORE (Vulnerable): Missing authorization check\npublic void deleteUserData(String userId) {\n    database.delete(\"\
+    users\", \"id = ?\", new String[]{userId});\n}\n\n// AFTER (Secure): Proper authorization validation\npublic void deleteUserData(String\
+    \ userId, String currentUserId) {\n    // Check if current user is authorized to delete this data\n    if (!isAuthorized(currentUserId,\
+    \ userId)) {\n        throw new SecurityException(\"Unauthorized access attempt\");\n    }\n    \n    // Additional role-based\
+    \ check\n    UserRole role = getUserRole(currentUserId);\n    if (!role.hasPermission(Permission.DELETE_USER_DATA)) {\n\
+    \        throw new SecurityException(\"Insufficient permissions\");\n    }\n    \n    database.delete(\"users\", \"id\
+    \ = ?\", new String[]{userId});\n}"
+  apis:
+  - Role-Based Access Control
+  - Permission Validation
+  - SecurityException
+client_code_quality:
+  action: Implement proper input validation and output encoding to prevent injection attacks
+  fix_example: "// BEFORE (Vulnerable): SQL injection and XSS\nString query = \"SELECT * FROM users WHERE name='\" + userInput\
+    \ + \"'\";\nwebView.loadData(userContent, \"text/html\", \"UTF-8\");\n\n// AFTER (Secure): Parameterized queries and proper\
+    \ encoding\n// Use prepared statements for SQL\nSQLiteStatement stmt = db.compileStatement(\"SELECT * FROM users WHERE\
+    \ name = ?\");\nstmt.bindString(1, userInput);\n\n// Sanitize content for WebView\npublic String sanitizeHtml(String input)\
+    \ {\n    return Html.escapeHtml(input);\n}\n\n// Input validation\npublic boolean isValidInput(String input) {\n    Pattern\
+    \ pattern = Pattern.compile(\"^[a-zA-Z0-9\\\\s]{1,50}$\");\n    return pattern.matcher(input).matches();\n}\n\nwebView.loadData(sanitizeHtml(userContent),\
+    \ \"text/html\", \"UTF-8\");"
+  apis:
+  - SQLiteStatement
+  - Html.escapeHtml
+  - Pattern.compile
+code_tampering:
+  action: Implement runtime application self-protection (RASP) and integrity checks
+  fix_example: "// BEFORE (Vulnerable): No tamper detection\n// App runs without integrity checks\n\n// AFTER (Secure): Implement\
+    \ tamper detection\npublic class TamperDetection {\n    public static boolean isDebuggingEnabled() {\n        return (getApplicationInfo().flags\
+    \ & ApplicationInfo.FLAG_DEBUGGABLE) != 0;\n    }\n    \n    public static boolean isEmulator() {\n        return Build.FINGERPRINT.contains(\"\
+    generic\") ||\n               Build.MODEL.contains(\"google_sdk\") ||\n               Build.MODEL.contains(\"Emulator\"\
+    );\n    }\n    \n    public static boolean verifySignature(Context context) {\n        try {\n            PackageInfo\
+    \ packageInfo = context.getPackageManager()\n                .getPackageInfo(context.getPackageName(), PackageManager.GET_SIGNATURES);\n\
+    \            Signature[] signatures = packageInfo.signatures;\n            // Verify against known good signature hash\n\
+    \            return verifySignatureHash(signatures[0]);\n        } catch (Exception e) {\n            return false;\n\
+    \        }\n    }\n}"
+  apis:
+  - PackageManager.GET_SIGNATURES
+  - ApplicationInfo.FLAG_DEBUGGABLE
+  - Build.FINGERPRINT
+reverse_engineering:
+  action: Implement code obfuscation and runtime protection mechanisms
+  fix_example: "// BEFORE (Vulnerable): No code protection\npublic class SecretAlgorithm {\n    private static final String\
+    \ SECRET_KEY = \"my_secret_key\";\n    public String doSomething() { /* sensitive logic */ }\n}\n\n// AFTER (Secure):\
+    \ Obfuscated and protected\n// Use ProGuard/R8 obfuscation in build.gradle:\nandroid {\n    buildTypes {\n        release\
+    \ {\n            minifyEnabled true\n            shrinkResources true\n            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'),\
+    \ 'proguard-rules.pro'\n        }\n    }\n}\n\n// Runtime checks for analysis tools\npublic class AntiAnalysis {\n   \
+    \ static {\n        if (isDebuggingAttached() || isHookingDetected()) {\n            System.exit(0);\n        }\n    }\n\
+    \    \n    private static boolean isHookingDetected() {\n        // Check for common hooking frameworks\n        return\
+    \ checkForFrida() || checkForXposed();\n    }\n}"
+  apis:
+  - ProGuard
+  - R8 Optimization
+  - Runtime Protection
+extraneous_functionality:
+  action: Remove debug code, test endpoints, and unnecessary functionality from production builds
+  fix_example: "// BEFORE (Vulnerable): Debug code in production\npublic class ApiService {\n    private static final boolean\
+    \ DEBUG = true;\n    \n    public void debugEndpoint(String data) {\n        if (DEBUG) {\n            // This should\
+    \ not be in production!\n            logSensitiveData(data);\n        }\n    }\n}\n\n// AFTER (Secure): Conditional compilation\
+    \ and proper build variants\npublic class ApiService {\n    private static final boolean DEBUG = BuildConfig.DEBUG;\n\
+    \    \n    public void processData(String data) {\n        // Only include debug functionality in debug builds\n     \
+    \   if (DEBUG && BuildConfig.BUILD_TYPE.equals(\"debug\")) {\n            Log.d(\"DEBUG\", \"Processing data: \" + sanitizeForLog(data));\n\
+    \        }\n        // Production logic only\n        processDataSecurely(data);\n    }\n    \n    // Remove debug endpoints\
+    \ completely for release builds\n    @DebugOnly\n    public void debugEndpoint(String data) {\n        // This method\
+    \ won't be included in release builds\n    }\n}"
+  apis:
+  - BuildConfig.DEBUG
+  - BuildConfig.BUILD_TYPE
+  - Conditional Compilation
+hardcoded_secrets:
+  action: Remove hardcoded secrets and use secure storage mechanisms
+  fix_example: "// BEFORE (Vulnerable):\nString password = \"hardcoded123\";\nString apiKey = \"sk-1234567890abcdef\";\n\n\
+    // AFTER (Secure): Use Android Keystore for secure storage\nKeyGenerator keyGen = KeyGenerator.getInstance(\"AES\", \"\
+    AndroidKeyStore\");\nKeyGenParameterSpec keyGenSpec = new KeyGenParameterSpec.Builder(\"MySecretKey\",\n    KeyProperties.PURPOSE_ENCRYPT\
+    \ | KeyProperties.PURPOSE_DECRYPT)\n    .setBlockModes(KeyProperties.BLOCK_MODE_GCM)\n    .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)\n\
+    \    .build();\nkeyGen.init(keyGenSpec);\nkeyGen.generateKey();\n\n// Store API keys securely\nEncryptedSharedPreferences\
+    \ prefs = EncryptedSharedPreferences.create(\n    \"secret_prefs\", masterKey, context,\n    EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,\n\
+    \    EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM);"
+  apis:
+  - AndroidKeyStore
+  - EncryptedSharedPreferences
+  - KeyGenParameterSpec
+sql_injection:
+  action: Use parameterized queries or prepared statements to prevent SQL injection
+  fix_example: '// BEFORE (Vulnerable):
+
+    String query = "SELECT * FROM users WHERE name=''" + userInput + "''";
+
+    db.execSQL(query);
+
+
+    // AFTER (Secure): Use parameterized queries
+
+    ContentValues values = new ContentValues();
+
+    values.put("name", userInput);
+
+    db.insert("users", null, values);
+
+
+    // Or use SQLiteStatement for complex queries
+
+    SQLiteStatement stmt = db.compileStatement("SELECT * FROM users WHERE name=? AND age>?");
+
+    stmt.bindString(1, userName);
+
+    stmt.bindLong(2, minAge);
+
+    Cursor cursor = stmt.executeQuery();'
+  apis:
+  - ContentValues
+  - SQLiteStatement
+  - bindString
+  - bindLong
+weak_crypto:
+  action: Replace weak cryptographic algorithms with modern, secure alternatives
+  fix_example: '// BEFORE (Vulnerable):
+
+    MessageDigest md = MessageDigest.getInstance("MD5");
+
+    Cipher cipher = Cipher.getInstance("DES");
+
+
+    // AFTER (Secure): Use strong algorithms
+
+    MessageDigest md = MessageDigest.getInstance("SHA-256");
+
+    Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+
+
+    // For key derivation, use PBKDF2
+
+    SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
+
+    KeySpec spec = new PBEKeySpec(password.toCharArray(), salt, 100000, 256);
+
+    SecretKey tmp = factory.generateSecret(spec);
+
+    SecretKey secret = new SecretKeySpec(tmp.getEncoded(), "AES");'
+  apis:
+  - SHA-256
+  - AES/GCM/NoPadding
+  - PBKDF2WithHmacSHA256
+cleartext_http:
+  action: Use HTTPS for all network communications and implement certificate pinning
+  fix_example: "// BEFORE (Vulnerable):\nURL url = new URL(\"http://example.com/api\");\n\n// AFTER (Secure): HTTPS with certificate\
+    \ pinning\nURL url = new URL(\"https://example.com/api\");\n\n// Implement certificate pinning with OkHttp\nCertificatePinner\
+    \ certificatePinner = new CertificatePinner.Builder()\n    .add(\"api.example.com\", \"sha256/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\"\
+    )\n    .build();\n\nOkHttpClient client = new OkHttpClient.Builder()\n    .certificatePinner(certificatePinner)\n    .build();\n\
+    \n// In AndroidManifest.xml:\n<application android:usesCleartextTraffic=\"false\">\n    <meta-data android:name=\"android.security.NET_CONFIG\"\
+    \ \n               android:resource=\"@xml/network_security_config\" />\n</application>"
+  apis:
+  - HttpsURLConnection
+  - CertificatePinner
+  - NetworkSecurityConfig

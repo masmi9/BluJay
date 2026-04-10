@@ -1,0 +1,12 @@
+# IODS Analysis Dependencies (includes ML)
+-r base.txt
+scikit-learn>=1.3.0
+xgboost>=2.0.0
+shap>=0.43.0
+numpy>=1.24.0
+pandas>=2.0.0
+# Optional: frida (install separately per platform)
+# frida>=16.0.0
+# frida-tools>=12.0.0
+# Optional: chromadb for vector search
+# chromadb>=0.4.0

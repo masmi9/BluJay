@@ -1,0 +1,37 @@
+{
+  "model_name": "calibration",
+  "trained_at": "2026-03-15T16:49:39",
+  "aods_version": "1.0.0",
+  "dataset": "dataset_combined_v5 (real data)",
+  "metrics": {
+    "temperature": {
+      "T": 1.0,
+      "ece_before": 0.044556250000022765,
+      "ece_after_train": 0.03752992840086093,
+      "ece_after_val": 0.044556250000022765,
+      "mce_after_val": 0.3890169491525417
+    },
+    "platt": {
+      "a": 0.6,
+      "b": 1.1,
+      "ece_before": 0.044556250000022765,
+      "ece_after_train": 0.023832051043697386,
+      "ece_after_val": 0.026829766756179384,
+      "mce_after_val": 0.6595942262311719
+    },
+    "isotonic": {
+      "num_points": 17,
+      "ece_before": 0.044556250000022765,
+      "ece_after_train": 0.053041612403488855,
+      "ece_after_val": 0.05229582799747584,
+      "mce_after_val": 0.11619187611411164
+    },
+    "best_method": "platt",
+    "best_val_ece": 0.026829766756179384,
+    "ece_before": 0.044556250000022765,
+    "mce_before": 0.3890169491525417,
+    "samples_train": 8380,
+    "samples_val": 2096,
+    "runtime_artifact": "/home/kali/PROJECTS/AODS/AODS-feature-ui-rbac-sse-e2e-20260119-061413/models/unified_ml/calibration.json"
+  }
+}

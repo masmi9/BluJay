@@ -1,0 +1,8 @@
+{
+  "apiBaseUrl": "http://127.0.0.1:8089/api",
+  "webBasePath": "/",
+  "workspaceRoot": "workspace",
+  "platform": "iOS",
+  "scannerName": "IODS",
+  "version": "1.0.0"
+}

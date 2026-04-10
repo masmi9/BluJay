@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1024" viewBox="0 0 1440 1024">
+  <title>AODS — Audit Log (Dark, MD3)</title>
+  <desc>Dark theme Audit Log screen with filters and log entries.</desc>
+  <rect width="1440" height="1024" fill="#0b0c0f" />
+  <!-- App bar -->
+  <g>
+    <rect x="0" y="0" width="1440" height="64" fill="#111318"/>
+    <text x="60" y="38" font-family="Inter, Roboto, Arial" font-size="18" fill="#e3e6eb" font-weight="700">AODS</text>
+    <text x="120" y="38" font-family="Inter, Roboto, Arial" font-size="16" fill="#aeb4bf">Audit Log</text>
+  </g>
+  <!-- Nav drawer -->
+  <g>
+    <rect x="0" y="64" width="264" height="960" fill="#0f1116"/>
+    <line x1="264" y1="64" x2="264" y2="1024" stroke="#1a1d24"/>
+    <text x="24" y="112" font-family="Inter, Roboto, Arial" font-size="12" fill="#aeb4bf">SECTIONS</text>
+    <rect x="16" y="128" width="232" height="40" rx="10" fill="#141821"/>
+    <text x="32" y="154" font-family="Inter, Roboto, Arial" font-size="13" fill="#e3e6eb">Dashboard</text>
+    <rect x="16" y="176" width="232" height="40" rx="10" fill="#1e3a8a"/>
+    <text x="32" y="202" font-family="Inter, Roboto, Arial" font-size="13" fill="#ffffff" font-weight="600">Audit Log</text>
+  </g>
+  <!-- Content -->
+  <g transform="translate(296,96)">
+    <text x="0" y="0" font-family="Inter, Roboto, Arial" font-size="20" fill="#e3e6eb" font-weight="700">Audit Log</text>
+    <!-- Filters -->
+    <g transform="translate(0,28)">
+      <rect x="0" y="16" width="1048" height="72" rx="16" fill="#111318" stroke="#1a1d24"/>
+      <rect x="20" y="32" width="200" height="36" rx="10" fill="#0f1116" stroke="#22262f"/>
+      <text x="32" y="55" font-family="Inter, Roboto, Arial" font-size="12" fill="#aeb4bf">User</text>
+      <rect x="232" y="32" width="200" height="36" rx="10" fill="#0f1116" stroke="#22262f"/>
+      <text x="244" y="55" font-family="Inter, Roboto, Arial" font-size="12" fill="#aeb4bf">Action</text>
+      <rect x="444" y="32" width="200" height="36" rx="10" fill="#0f1116" stroke="#22262f"/>
+      <text x="456" y="55" font-family="Inter, Roboto, Arial" font-size="12" fill="#aeb4bf">Date range</text>
+      <rect x="656" y="32" width="120" height="36" rx="10" fill="#1e3a8a"/>
+      <text x="692" y="55" font-family="Inter, Roboto, Arial" font-size="12" fill="#fff" font-weight="600">Apply</text>
+    </g>
+    <!-- Log entries -->
+    <g transform="translate(0,132)">
+      <rect x="0" y="0" width="1048" height="640" rx="16" fill="#111318" stroke="#1a1d24"/>
+      <g transform="translate(20,24)">
+        <text x="0" y="0" font-family="Inter, Roboto, Arial" font-size="12" fill="#aeb4bf">TIME</text>
+        <text x="200" y="0" font-family="Inter, Roboto, Arial" font-size="12" fill="#aeb4bf">USER</text>
+        <text x="420" y="0" font-family="Inter, Roboto, Arial" font-size="12" fill="#aeb4bf">ACTION</text>
+      </g>
+      <g transform="translate(20,40)">
+        <rect x="0" y="0" width="1008" height="44" rx="10" fill="#141821"/>
+        <text x="12" y="28" font-family="Inter, Roboto, Arial" font-size="12" fill="#d6dbe3">12:04</text>
+        <text x="200" y="28" font-family="Inter, Roboto, Arial" font-size="12" fill="#d6dbe3">jane@acme</text>
+        <text x="420" y="28" font-family="Inter, Roboto, Arial" font-size="12" fill="#d6dbe3">Updated policy OWASP-Top10</text>
+      </g>
+      <g transform="translate(20,92)">
+        <rect x="0" y="0" width="1008" height="44" rx="10" fill="#111318" stroke="#1a1d24"/>
+        <text x="12" y="28" font-family="Inter, Roboto, Arial" font-size="12" fill="#d6dbe3">11:49</text>
+        <text x="200" y="28" font-family="Inter, Roboto, Arial" font-size="12" fill="#d6dbe3">svc-bot</text>
+        <text x="420" y="28" font-family="Inter, Roboto, Arial" font-size="12" fill="#d6dbe3">Ingested scan web-dev #238</text>
+      </g>
+      <g transform="translate(20,144)">
+        <rect x="0" y="0" width="1008" height="44" rx="10" fill="#111318" stroke="#1a1d24"/>
+        <text x="12" y="28" font-family="Inter, Roboto, Arial" font-size="12" fill="#d6dbe3">10:02</text>
+        <text x="200" y="28" font-family="Inter, Roboto, Arial" font-size="12" fill="#d6dbe3">john@acme</text>
+        <text x="420" y="28" font-family="Inter, Roboto, Arial" font-size="12" fill="#d6dbe3">Created new user alice@acme</text>
+      </g>
+    </g>
+  </g>
+</svg>

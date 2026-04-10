@@ -1,0 +1,294 @@
+# AODS Docker Compose
+# Profiles: dev (local development), ci (CI testing), prod (production)
+#
+# Usage:
+#   docker compose --profile dev up -d api-ui       # Start API+UI for local dev
+#   docker compose --profile ci run --rm ci-runner pytest  # Run tests in CI
+#   docker compose --profile prod up -d api-ui      # Start production API+UI
+#
+# Environment Variables:
+#   AODS_DISABLE_ML        - Disable ML features (default: 0)
+#   AODS_STATIC_ONLY_HARD  - Force static-only mode (default: 0)
+#   ADB_SERVER_SOCKET      - ADB server socket (default: tcp:host.docker.internal:5037)
+#   AODS_WEB_BASE          - UI base path (default: /ui)
+#   AODS_API_BASE          - API base path (default: /api)
+#
+# Secrets:
+#   Place secret files in ./secrets/ directory (gitignored)
+#   - aods_admin_password: Admin password for API authentication
+#   - aods_api_token: API token for external integrations
+
+services:
+  # =============================================================================
+  # API + UI Service (serves both FastAPI backend and React frontend)
+  # =============================================================================
+  api-ui:
+    build:
+      context: .
+      dockerfile: tools/docker/Dockerfile.api-ui
+      target: runtime
+      args:
+        NODE_BASE: node:20-alpine
+        PY_BASE: python:3.11-slim
+    image: local/aods-api-ui:latest
+    container_name: aods-api-ui
+    ports:
+      - "8081:8081"
+    environment:
+      - AODS_DISABLE_ML=${AODS_DISABLE_ML:-0}
+      - AODS_STATIC_ONLY_HARD=${AODS_STATIC_ONLY_HARD:-0}
+      - AODS_WEB_BASE=${AODS_WEB_BASE:-/ui}
+      - AODS_API_BASE=${AODS_API_BASE:-/api}
+      - AODS_TITLE=${AODS_TITLE:-AODS}
+      # ADB networking - prefer TCP host ADB
+      - ADB_SERVER_SOCKET=${ADB_SERVER_SOCKET:-tcp:host.docker.internal:5037}
+      # Timezone and locale for consistent timestamps
+      - TZ=UTC
+      - LANG=C.UTF-8
+      - LC_ALL=C.UTF-8
+    extra_hosts:
+      # Enable host.docker.internal on Linux (automatic on Docker Desktop)
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - aods_artifacts:/app/artifacts
+      - aods_reports:/app/reports
+      - aods_logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8081/api/health"]
+      interval: 30s
+      timeout: 3s
+      start_period: 30s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    labels:
+      - "com.aods.service=api-ui"
+      - "com.aods.lifecycle=persistent"
+    profiles:
+      - dev
+
+  # Production API+UI with security hardening
+  api-ui-prod:
+    build:
+      context: .
+      dockerfile: tools/docker/Dockerfile.api-ui
+      target: runtime
+      args:
+        NODE_BASE: node:20-alpine
+        PY_BASE: python:3.11-slim
+    image: local/aods-api-ui:latest
+    container_name: aods-api-ui-prod
+    ports:
+      - "8081:8081"
+    environment:
+      - AODS_DISABLE_ML=${AODS_DISABLE_ML:-0}
+      - AODS_STATIC_ONLY_HARD=${AODS_STATIC_ONLY_HARD:-0}
+      - AODS_WEB_BASE=${AODS_WEB_BASE:-/ui}
+      - AODS_API_BASE=${AODS_API_BASE:-/api}
+      - AODS_TITLE=${AODS_TITLE:-AODS}
+      - ADB_SERVER_SOCKET=${ADB_SERVER_SOCKET:-tcp:host.docker.internal:5037}
+      - TZ=UTC
+      - LANG=C.UTF-8
+      - LC_ALL=C.UTF-8
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - aods_artifacts:/app/artifacts
+      - aods_reports:/app/reports
+      - aods_logs:/app/logs
+    # Security hardening for production
+    read_only: true
+    tmpfs:
+      - /tmp:mode=1777,size=100m
+      - /app/design/ui/react-app/dist/config:mode=1777,size=1m
+      - /app/cache:mode=1777,size=50m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    user: "10001:10001"
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8081/api/health"]
+      interval: 30s
+      timeout: 3s
+      start_period: 30s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    labels:
+      - "com.aods.service=api-ui"
+      - "com.aods.lifecycle=persistent"
+      - "com.aods.env=production"
+    secrets:
+      - aods_admin_password
+    profiles:
+      - prod
+
+  # =============================================================================
+  # Worker Service (scan execution)
+  # =============================================================================
+  worker:
+    build:
+      context: .
+      dockerfile: tools/docker/Dockerfile.worker
+      target: runtime
+      args:
+        PY_BASE: python:3.11-slim
+    image: local/aods-worker:latest
+    container_name: aods-worker
+    environment:
+      - AODS_DISABLE_ML=${AODS_DISABLE_ML:-1}
+      - AODS_STATIC_ONLY_HARD=${AODS_STATIC_ONLY_HARD:-1}
+      - ADB_SERVER_SOCKET=${ADB_SERVER_SOCKET:-tcp:host.docker.internal:5037}
+      - TZ=UTC
+      - LANG=C.UTF-8
+      - LC_ALL=C.UTF-8
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - aods_artifacts:/app/artifacts
+      - aods_reports:/app/reports
+      - aods_logs:/app/logs
+      - ./samples:/app/samples:ro
+      - ./apks:/app/apks:ro
+    # Security hardening
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    # Resource limits for scan worker
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 8G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
+    healthcheck:
+      test: ["CMD-SHELL", "/app/tools/docker/healthcheck.worker.sh"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    labels:
+      - "com.aods.service=worker"
+      - "com.aods.lifecycle=persistent"
+    profiles:
+      - dev
+
+  # =============================================================================
+  # CI Runner Service (test execution)
+  # =============================================================================
+  ci-runner:
+    build:
+      context: .
+      dockerfile: tools/docker/Dockerfile.worker
+      target: runtime
+      args:
+        PY_BASE: python:3.11-slim
+    image: local/aods-ci-runner:latest
+    container_name: aods-ci-runner
+    working_dir: /app
+    environment:
+      - PYTHONPATH=/app
+      - AODS_DISABLE_ML=1
+      - AODS_STATIC_ONLY_HARD=1
+      - TZ=UTC
+      - LANG=C.UTF-8
+      - LC_ALL=C.UTF-8
+    volumes:
+      - .:/app
+      - aods_artifacts:/app/artifacts
+      - aods_cache:/root/.cache
+    # Resource limits for CI
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    labels:
+      - "com.aods.service=ci-runner"
+      - "com.aods.lifecycle=ephemeral"
+    profiles:
+      - ci
+
+  # =============================================================================
+  # Playwright E2E Testing Service (optional)
+  # =============================================================================
+  playwright:
+    image: mcr.microsoft.com/playwright:v1.48.2-jammy
+    container_name: aods-playwright
+    working_dir: /app/design/ui/react-app
+    environment:
+      - PLAYWRIGHT_BROWSERS_PATH=0
+      - CI=true
+      - UI_URL=http://api-ui:8081/ui
+      - API_URL=http://api-ui:8081
+    volumes:
+      - .:/app
+      - aods_artifacts:/app/artifacts
+    shm_size: "1g"
+    depends_on:
+      api-ui:
+        condition: service_healthy
+    command: ["npx", "playwright", "test", "--reporter=list"]
+    labels:
+      - "com.aods.service=playwright"
+      - "com.aods.lifecycle=ephemeral"
+    profiles:
+      - e2e
+
+# =============================================================================
+# Named Volumes with Lifecycle Labels
+# =============================================================================
+volumes:
+  aods_artifacts:
+    labels:
+      - "com.aods.persist=true"
+      - "com.aods.description=Scan artifacts and reports"
+  aods_reports:
+    labels:
+      - "com.aods.persist=true"
+      - "com.aods.description=Generated reports"
+  aods_logs:
+    labels:
+      - "com.aods.persist=true"
+      - "com.aods.description=Application logs"
+  aods_cache:
+    labels:
+      - "com.aods.lifecycle=ephemeral"
+      - "com.aods.description=Build and dependency cache"
+
+# =============================================================================
+# Secrets (place files in ./secrets/ directory)
+# =============================================================================
+secrets:
+  aods_admin_password:
+    file: ./secrets/aods_admin_password
+  aods_api_token:
+    file: ./secrets/aods_api_token

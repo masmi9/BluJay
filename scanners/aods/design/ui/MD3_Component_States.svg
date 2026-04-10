@@ -1,0 +1,126 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1024" viewBox="0 0 1440 1024">
+  <defs>
+    <style>
+      .bg { fill: #0b0c0f; }
+      .surface { fill: #111318; }
+      .outline { stroke: #1a1d24; stroke-width: 1; }
+      .text { fill: #e3e6eb; font-family: 'Inter', 'Roboto', Arial, sans-serif; }
+      .muted { fill: #aeb4bf; font-family: 'Inter', 'Roboto', Arial, sans-serif; }
+      .accent { fill: #86b6ff; }
+      .danger { fill: #ff6b6b; }
+      .warning { fill: #ffd166; }
+      .success { fill: #5bd17f; }
+    </style>
+  </defs>
+  <rect class="bg" width="1440" height="1024"/>
+  <g>
+    <rect class="surface outline" x="0" y="0" width="1440" height="64"/>
+    <text class="text" x="24" y="40" font-size="18" font-weight="600">AODS — Component States (Dark)</text>
+  </g>
+  <!-- Buttons -->
+  <g transform="translate(32,96)">
+    <text class="muted" x="0" y="0" font-size="12" font-weight="600">Buttons</text>
+    <g transform="translate(0,16)">
+      <rect x="0" y="0" width="140" height="40" rx="20" class="accent"/>
+      <text class="bg" x="20" y="26" font-size="12" font-weight="600">Primary / Enabled</text>
+    </g>
+    <g transform="translate(160,16)">
+      <rect x="0" y="0" width="140" height="40" rx="20" fill="#6aa2f5"/>
+      <text class="bg" x="20" y="26" font-size="12" font-weight="600">Primary / Hover</text>
+    </g>
+    <g transform="translate(320,16)">
+      <rect x="0" y="0" width="140" height="40" rx="20" fill="#4d89e8"/>
+      <text class="bg" x="20" y="26" font-size="12" font-weight="600">Primary / Pressed</text>
+    </g>
+    <g transform="translate(480,16)">
+      <rect x="0" y="0" width="140" height="40" rx="20" fill="#2a2e37" stroke="#1a1d24"/>
+      <text class="muted" x="14" y="26" font-size="12" font-weight="600">Primary / Disabled</text>
+    </g>
+    <g transform="translate(640,16)">
+      <rect x="0" y="0" width="160" height="40" rx="20" fill="#0f1116" stroke="#22262f"/>
+      <text class="text" x="14" y="26" font-size="12" font-weight="600">Outlined / Enabled</text>
+    </g>
+    <g transform="translate(820,16)">
+      <rect x="0" y="0" width="160" height="40" rx="20" fill="#151922" stroke="#2b303a"/>
+      <text class="text" x="14" y="26" font-size="12" font-weight="600">Outlined / Hover</text>
+    </g>
+    <g transform="translate(1000,16)">
+      <rect x="0" y="0" width="160" height="40" rx="20" fill="#2a2e37" stroke="#1a1d24"/>
+      <text class="muted" x="14" y="26" font-size="12" font-weight="600">Outlined / Disabled</text>
+    </g>
+  </g>
+  <!-- Inputs -->
+  <g transform="translate(32,200)">
+    <text class="muted" x="0" y="0" font-size="12" font-weight="600">Text Fields</text>
+    <g transform="translate(0,16)">
+      <rect x="0" y="0" width="260" height="48" rx="10" fill="#0f1116" stroke="#22262f"/>
+      <text class="muted" x="12" y="28" font-size="12">Idle</text>
+    </g>
+    <g transform="translate(280,16)">
+      <rect x="0" y="0" width="260" height="48" rx="10" fill="#0f1116" stroke="#2e6ae6"/>
+      <text class="text" x="12" y="28" font-size="12">Focused</text>
+    </g>
+    <g transform="translate(560,16)">
+      <rect x="0" y="0" width="260" height="48" rx="10" fill="#0f1116" stroke="#3a3f4a"/>
+      <text class="muted" x="12" y="28" font-size="12">Hover</text>
+    </g>
+    <g transform="translate(840,16)">
+      <rect x="0" y="0" width="260" height="48" rx="10" fill="#0f1116" stroke="#ff6b6b"/>
+      <text class="danger" x="12" y="28" font-size="12">Error</text>
+    </g>
+  </g>
+  <!-- Table Row States -->
+  <g transform="translate(32,320)">
+    <text class="muted" x="0" y="0" font-size="12" font-weight="600">Table Row States</text>
+    <g transform="translate(0,16)">
+      <rect x="0" y="0" width="600" height="44" rx="8" fill="#0f1116" stroke="#22262f"/>
+      <text class="text" x="12" y="27" font-size="12">Default</text>
+    </g>
+    <g transform="translate(0,68)">
+      <rect x="0" y="0" width="600" height="44" rx="8" fill="#141821" stroke="#2b303a"/>
+      <text class="text" x="12" y="27" font-size="12">Hover</text>
+    </g>
+    <g transform="translate(0,120)">
+      <rect x="0" y="0" width="600" height="44" rx="8" fill="#10131a" stroke="#2e6ae6"/>
+      <text class="text" x="12" y="27" font-size="12">Focus (with ring)</text>
+    </g>
+    <g transform="translate(0,172)">
+      <rect x="0" y="0" width="600" height="44" rx="8" fill="#1a1f29" stroke="#394152"/>
+      <text class="muted" x="12" y="27" font-size="12">Selected</text>
+    </g>
+  </g>
+  <!-- Status & Feedback -->
+  <g transform="translate(680,320)">
+    <text class="muted" x="0" y="0" font-size="12" font-weight="600">Feedback</text>
+    <g transform="translate(0,16)">
+      <rect x="0" y="0" width="360" height="48" rx="12" class="success"/>
+      <text class="bg" x="12" y="30" font-size="12" font-weight="600">Toast — Success</text>
+    </g>
+    <g transform="translate(0,72)">
+      <rect x="0" y="0" width="360" height="48" rx="12" class="warning"/>
+      <text class="bg" x="12" y="30" font-size="12" font-weight="600">Toast — Warning</text>
+    </g>
+    <g transform="translate(0,128)">
+      <rect x="0" y="0" width="360" height="48" rx="12" class="danger"/>
+      <text class="bg" x="12" y="30" font-size="12" font-weight="600">Toast — Error</text>
+    </g>
+  </g>
+  <!-- Loading -->
+  <g transform="translate(32,560)">
+    <text class="muted" x="0" y="0" font-size="12" font-weight="600">Loading & Skeleton</text>
+    <g transform="translate(0,16)">
+      <rect x="0" y="0" width="280" height="140" rx="12" fill="#0f1116" stroke="#22262f"/>
+      <rect x="16" y="16" width="248" height="16" rx="8" fill="#1a1d24"/>
+      <rect x="16" y="44" width="200" height="12" rx="6" fill="#1a1d24"/>
+      <rect x="16" y="64" width="220" height="12" rx="6" fill="#1a1d24"/>
+      <rect x="16" y="92" width="180" height="12" rx="6" fill="#1a1d24"/>
+      <text class="muted" x="16" y="124" font-size="12">Skeleton card</text>
+    </g>
+    <g transform="translate(320,16)">
+      <circle cx="20" cy="20" r="20" class="accent" opacity="0.25"/>
+      <circle cx="20" cy="20" r="14" class="accent" opacity="0.5"/>
+      <circle cx="20" cy="20" r="8" class="accent"/>
+      <text class="muted" x="52" y="26" font-size="12">Spinner</text>
+    </g>
+  </g>
+</svg>

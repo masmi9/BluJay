@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Scanner virtualenvs (inside monorepo)
+scanners/aods/aods_venv/
+scanners/iods/iods_venv/
+
+# Scanner output directories
+scanners/aods/output/
+scanners/iods/output/
+
+# Environment
+.env
+*.env
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# Tools (downloaded by setup scripts)
+tools/
+
+# Workspace / database
+*.db
+*.db-shm
+*.db-wal
+~/.apkanalysis/
+
+# Uploaded APKs / IPAs (large binaries)
+backend/uploads/
+scanners/*/output/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini

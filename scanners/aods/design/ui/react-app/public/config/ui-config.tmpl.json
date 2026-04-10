@@ -1,0 +1,5 @@
+{
+  "title": "${AODS_TITLE}",
+  "webBasePath": "${AODS_WEB_BASE}",
+  "apiBaseUrl": "${AODS_API_BASE}"
+}

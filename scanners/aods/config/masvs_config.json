@@ -1,0 +1,179 @@
+{
+  "masvs_compliance": {
+    "enabled": true,
+    "version": "2.0",
+    "target_coverage_percentage": 83.3,
+    "target_covered_controls": 20,
+    "operational_categories_target": 8,
+    "categories": {
+      "STORAGE": {
+        "name": "Data Storage and Privacy",
+        "description": "Secure storage of sensitive data",
+        "controls": [
+          "MASVS-STORAGE-1",
+          "MASVS-STORAGE-2"
+        ],
+        "plugins": [
+          "insecure_data_storage",
+          "privacy_leak_detection"
+        ]
+      },
+      "CRYPTO": {
+        "name": "Cryptography",
+        "description": "Cryptographic implementation security",
+        "controls": [
+          "MASVS-CRYPTO-1",
+          "MASVS-CRYPTO-2"
+        ],
+        "plugins": [
+          "cryptography_tests"
+        ]
+      },
+      "AUTH": {
+        "name": "Authentication and Session Management",
+        "description": "Authentication and session security",
+        "controls": [
+          "MASVS-AUTH-1",
+          "MASVS-AUTH-2",
+          "MASVS-AUTH-3"
+        ],
+        "plugins": [
+          "authentication_security_analysis",
+          "token_replay_analysis",
+          "biometric_security_analysis"
+        ]
+      },
+      "NETWORK": {
+        "name": "Network Communication",
+        "description": "Network communication security",
+        "controls": [
+          "MASVS-NETWORK-1",
+          "MASVS-NETWORK-2"
+        ],
+        "plugins": [
+          "network_cleartext_traffic",
+          "advanced_ssl_tls_analyzer",
+          "enhanced_network_security_analysis"
+        ]
+      },
+      "PLATFORM": {
+        "name": "Platform Interaction",
+        "description": "Platform-specific security features",
+        "controls": [
+          "MASVS-PLATFORM-1",
+          "MASVS-PLATFORM-2",
+          "MASVS-PLATFORM-3"
+        ],
+        "plugins": [
+          "webview_security_analysis",
+          "component_exploitation_plugin",
+          "injection_vulnerabilities",
+          "improper_platform_usage"
+        ]
+      },
+      "CODE": {
+        "name": "Code Quality",
+        "description": "Code quality and implementation security",
+        "controls": [
+          "MASVS-CODE-1",
+          "MASVS-CODE-2",
+          "MASVS-CODE-3",
+          "MASVS-CODE-4"
+        ],
+        "plugins": [
+          "dynamic_code_analyzer",
+          "apk_signing_certificate_analyzer",
+          "library_vulnerability_scanner"
+        ]
+      },
+      "RESILIENCE": {
+        "name": "Resilience Against Reverse Engineering",
+        "description": "Anti-tampering and reverse engineering protection",
+        "controls": [
+          "MASVS-RESILIENCE-1",
+          "MASVS-RESILIENCE-2",
+          "MASVS-RESILIENCE-3",
+          "MASVS-RESILIENCE-4"
+        ],
+        "plugins": [
+          "anti_tampering_analysis",
+          "emulator_detection_analyzer"
+        ]
+      },
+      "PRIVACY": {
+        "name": "Privacy",
+        "description": "Privacy protection and data minimization",
+        "controls": [
+          "MASVS-PRIVACY-1",
+          "MASVS-PRIVACY-2",
+          "MASVS-PRIVACY-3",
+          "MASVS-PRIVACY-4"
+        ],
+        "plugins": [
+          "privacy_analyzer",
+          "data_minimization_analyzer",
+          "consent_analyzer",
+          "tracking_analyzer"
+        ]
+      }
+    },
+    "analysis": {
+      "auto_analyze": true,
+      "generate_reports": true,
+      "track_improvements": true
+    },
+    "reporting": {
+      "format": [
+        "json",
+        "html"
+      ],
+      "include_recommendations": true,
+      "detailed_breakdown": true
+    },
+    "validation": {
+      "test_controls": true,
+      "validate_plugins": true,
+      "benchmark_coverage": true
+    }
+  },
+  "plugin_mapping": {
+    "STORAGE": [
+      "insecure_data_storage",
+      "privacy_leak_detection"
+    ],
+    "CRYPTO": [
+      "cryptography_tests"
+    ],
+    "AUTH": [
+      "authentication_security_analysis",
+      "token_replay_analysis",
+      "biometric_security_analysis"
+    ],
+    "NETWORK": [
+      "network_cleartext_traffic",
+      "advanced_ssl_tls_analyzer",
+      "enhanced_network_security_analysis"
+    ],
+    "PLATFORM": [
+      "webview_security_analysis",
+      "component_exploitation_plugin",
+      "injection_vulnerabilities",
+      "improper_platform_usage"
+    ],
+    "CODE": [
+      "dynamic_code_analyzer",
+      "apk_signing_certificate_analyzer",
+      "library_vulnerability_scanner"
+    ],
+    "RESILIENCE": [
+      "anti_tampering_analysis",
+      "emulator_detection_analyzer"
+    ],
+    "PRIVACY": [
+      "privacy_analyzer",
+      "data_minimization_analyzer",
+      "consent_analyzer",
+      "tracking_analyzer"
+    ]
+  }
+}

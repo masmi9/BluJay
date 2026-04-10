@@ -1,0 +1,54 @@
+{
+  "deprecated_items": [
+    {
+      "name": "legacy_run_function",
+      "type": "function",
+      "deprecated_since": "2026-02-20T18:50:14.028480",
+      "removal_date": "2026-08-19T18:50:14.028480",
+      "replacement": "BasePluginV2.execute()",
+      "migration_guide": "Migrate to BasePlugin v2 interface with execute() method",
+      "reason": "Standardization to BasePlugin v2 interface",
+      "usage_count": 0,
+      "last_used": null,
+      "affected_plugins": []
+    },
+    {
+      "name": "legacy_analyze_function",
+      "type": "function",
+      "deprecated_since": "2026-02-20T18:50:14.028480",
+      "removal_date": "2026-08-19T18:50:14.028480",
+      "replacement": "BasePluginV2.execute()",
+      "migration_guide": "Migrate to BasePlugin v2 interface with execute() method",
+      "reason": "Standardization to BasePlugin v2 interface",
+      "usage_count": 0,
+      "last_used": null,
+      "affected_plugins": []
+    },
+    {
+      "name": "ad_hoc_plugin_interface",
+      "type": "interface",
+      "deprecated_since": "2026-02-20T18:50:14.028480",
+      "removal_date": "2026-08-19T18:50:14.028480",
+      "replacement": "BasePluginV2",
+      "migration_guide": "Inherit from BasePluginV2 and implement required methods",
+      "reason": "Standardization to unified plugin interface",
+      "usage_count": 0,
+      "last_used": null,
+      "affected_plugins": []
+    },
+    {
+      "name": "tuple_result_format",
+      "type": "format",
+      "deprecated_since": "2026-02-20T18:50:14.028480",
+      "removal_date": "2026-08-19T18:50:14.028480",
+      "replacement": "PluginResult",
+      "migration_guide": "Return PluginResult object instead of tuple",
+      "reason": "Standardization to structured result format",
+      "usage_count": 0,
+      "last_used": null,
+      "affected_plugins": []
+    }
+  ],
+  "usage_stats": {},
+  "last_updated": "2026-02-20T18:50:14.028524"
+}

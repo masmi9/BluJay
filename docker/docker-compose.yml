@@ -1,0 +1,20 @@
+version: "3.9"
+
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - apkanalysis_data:/root/.apkanalysis
+    environment:
+      # ADB server running on the host — container connects to it
+      - ADB_SERVER_SOCKET=tcp:host-gateway:5037
+    extra_hosts:
+      - "host-gateway:host-gateway"
+    restart: unless-stopped
+
+volumes:
+  apkanalysis_data:

@@ -1,0 +1,256 @@
+# AODS Quality Assurance Automation Configuration
+# ==============================================
+#
+# Configuration for QA automation framework
+# including test orchestration, quality validation, and regression detection
+
+# Test Orchestrator Configuration
+test_orchestrator:
+  max_parallel_tests: 4
+  default_timeout: 300  # 5 minutes
+  test_data_path: "tests/data"
+  results_path: "tests/results"
+  
+  # Test discovery patterns
+  test_discovery:
+    unit: 
+      - "tests/unit/**/*test*.py"
+      - "tests/unit/**/*_test.py"
+    integration:
+      - "tests/integration/**/*test*.py"
+      - "tests/integration/**/*_test.py"
+    system:
+      - "tests/system/**/*test*.py"
+      - "tests/system/**/*_test.py"
+    performance:
+      - "tests/performance/**/*test*.py"
+      - "tests/performance/**/*_test.py"
+    security:
+      - "tests/security/**/*test*.py"
+      - "tests/security/**/*_test.py"
+  
+  # Test environments
+  environments:
+    development:
+      AODS_ENV: "test"
+      DEBUG: "true"
+      LOG_LEVEL: "DEBUG"
+    staging:
+      AODS_ENV: "staging"
+      DEBUG: "false"
+      LOG_LEVEL: "INFO"
+    production:
+      AODS_ENV: "production"
+      DEBUG: "false"
+      LOG_LEVEL: "WARNING"
+
+# Quality Validator Configuration
+quality_validator:
+  # Quality standards and minimum scores
+  quality_standards:
+    minimum_overall_score: 75.0
+    minimum_dimension_scores:
+      functionality: 80.0
+      performance: 70.0
+      security: 85.0
+      maintainability: 70.0
+      reliability: 80.0
+      usability: 65.0
+      compatibility: 70.0
+  
+  # Compliance rules and thresholds
+  compliance_rules:
+    test_coverage_minimum: 80.0
+    security_vulnerabilities_maximum: 0
+    performance_regression_threshold: 20.0  # 20% degradation
+    code_complexity_maximum: 10.0
+    documentation_coverage_minimum: 70.0
+    test_success_rate_minimum: 95.0
+    reliability_score_minimum: 90.0
+  
+  # Quality metric weights by dimension
+  dimension_weights:
+    functionality: 3.0
+    performance: 2.0
+    security: 3.0
+    maintainability: 2.0
+    reliability: 2.5
+    usability: 1.0
+    compatibility: 1.0
+  
+  # Trend analysis settings
+  trend_analysis:
+    history_length: 30  # Keep 30 assessments
+    regression_threshold: -10.0  # 10% score decrease
+    improvement_threshold: 5.0   # 5% score increase
+
+# Regression Detector Configuration
+regression_detector:
+  # Statistical parameters
+  confidence_level: 0.95
+  min_baseline_samples: 10
+  max_baseline_samples: 100
+  baseline_file: "tests/results/regression_baselines.json"
+  
+  # Regression thresholds by type and severity
+  regression_thresholds:
+    performance:
+      critical: 0.50  # 50% degradation
+      high: 0.25      # 25% degradation
+      medium: 0.10    # 10% degradation
+      low: 0.05       # 5% degradation
+    functionality:
+      critical: 0.20  # 20% test failure increase
+      high: 0.10      # 10% test failure increase
+      medium: 0.05    # 5% test failure increase
+      low: 0.02       # 2% test failure increase
+    quality:
+      critical: 0.30  # 30% quality score decrease
+      high: 0.20      # 20% quality score decrease
+      medium: 0.10    # 10% quality score decrease
+      low: 0.05       # 5% quality score decrease
+    security:
+      critical: 0.15  # 15% security score decrease
+      high: 0.10      # 10% security score decrease
+      medium: 0.05    # 5% security score decrease
+      low: 0.02       # 2% security score decrease
+  
+  # Anomaly detection settings
+  anomaly_detection:
+    enable: true
+    z_score_threshold: 3.0
+    trend_window: 10
+    outlier_detection: true
+
+# CI/CD Integration Configuration
+ci_cd:
+  # Quality gates - prevent deployment if thresholds not met
+  quality_gates:
+    enable: true
+    block_on_critical_regression: true
+    block_on_security_issues: true
+    block_on_low_coverage: true
+    
+    # Minimum scores to pass quality gate
+    minimum_scores:
+      overall_quality: 75.0
+      test_coverage: 80.0
+      security_score: 85.0
+      performance_score: 70.0
+  
+  # Automated actions
+  auto_actions:
+    update_baselines_on_success: true
+    create_github_issues_on_regression: false
+    notify_teams_on_failure: false
+    generate_reports: true
+  
+  # Notification settings
+  notifications:
+    slack_webhook: ""  # Set if using Slack notifications
+    email_recipients: []
+    github_labels: ["regression", "quality-issue"]
+
+# Performance Monitoring
+performance:
+  # Performance tracking settings
+  monitoring:
+    enable: true
+    collect_system_metrics: true
+    profile_memory_usage: true
+    track_execution_time: true
+  
+  # Performance baselines
+  baselines:
+    auto_update: true
+    update_frequency: "weekly"
+    retention_period: "90d"
+    
+    # Performance targets
+    targets:
+      max_test_duration: 300  # 5 minutes
+      max_memory_usage: 1024  # 1GB
+      max_cpu_usage: 80       # 80%
+      min_requests_per_second: 100
+
+# Security Testing Configuration
+security:
+  # Security scanning tools
+  tools:
+    bandit:
+      enable: true
+      config_file: ".bandit"
+      severity_level: "medium"
+    
+    safety:
+      enable: true
+      ignore_ids: []
+    
+    semgrep:
+      enable: false
+      config: "auto"
+  
+  # Security thresholds
+  thresholds:
+    max_high_severity_issues: 0
+    max_medium_severity_issues: 5
+    max_low_severity_issues: 20
+    vulnerability_age_limit: 30  # days
+
+# Reporting Configuration
+reporting:
+  # Report generation settings
+  formats:
+    - "json"
+    - "html"
+    - "junit"
+  
+  output_directory: "tests/reports"
+  
+  # Report content
+  include_sections:
+    - "executive_summary"
+    - "quality_assessment"
+    - "regression_analysis"
+    - "security_findings"
+    - "performance_metrics"
+    - "recommendations"
+    - "trend_analysis"
+  
+  # Report distribution
+  distribution:
+    save_to_file: true
+    upload_to_artifact_store: false
+    send_email: false
+
+# Advanced Features
+advanced:
+  # Machine learning for quality prediction
+  ml_features:
+    enable: false
+    model_path: "models/quality_predictor.pkl"
+    prediction_threshold: 0.8
+  
+  # Custom quality metrics
+  custom_metrics:
+    enable: true
+    metrics_directory: "tests/custom_metrics"
+  
+  # Integration with external tools
+  integrations:
+    sonarqube:
+      enable: false
+      server_url: ""
+      token: ""
+    
+    grafana:
+      enable: false
+      dashboard_url: ""
+      api_key: ""
+
+# Debugging and Development
+debug:
+  verbose_logging: false
+  save_intermediate_results: true
+  enable_profiling: false
+  debug_regression_detection: false

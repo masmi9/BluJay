@@ -1,0 +1,30 @@
+{
+  "version": "1.0",
+  "platform": "iOS",
+  "models": {
+    "classifier": "models/ios_classifier/model.pkl",
+    "calibrator": "models/ios_classifier/calibration.json"
+  },
+  "false_positive_reduction": {
+    "enabled": true,
+    "threshold_production": 0.05,
+    "threshold_vulnerable": 0.15,
+    "always_keep_severities": ["critical", "high"]
+  },
+  "confidence_calibration": {
+    "enabled": false,
+    "temperature": 1.0
+  },
+  "feature_weights": {
+    "severity_critical": 1.0,
+    "severity_high": 0.9,
+    "severity_medium": 0.7,
+    "severity_low": 0.4,
+    "severity_info": 0.1,
+    "confidence_boost": 0.2,
+    "has_cwe": 0.1,
+    "has_masvs": 0.1,
+    "has_file_path": 0.05,
+    "has_code_snippet": 0.05
+  }
+}

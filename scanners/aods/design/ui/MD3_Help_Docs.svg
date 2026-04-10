@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1024" viewBox="0 0 1440 1024">
+  <title>AODS — Help & Docs (Dark, MD3)</title>
+  <desc>Dark theme Help & Docs screen with search and quick start card.</desc>
+  <rect width="1440" height="1024" fill="#0b0c0f" />
+  <!-- App bar -->
+  <g>
+    <rect x="0" y="0" width="1440" height="64" fill="#111318"/>
+    <text x="60" y="38" font-family="Inter, Roboto, Arial" font-size="18" fill="#e3e6eb" font-weight="700">AODS</text>
+    <text x="120" y="38" font-family="Inter, Roboto, Arial" font-size="16" fill="#aeb4bf">Help & Docs</text>
+  </g>
+  <!-- Nav drawer -->
+  <g>
+    <rect x="0" y="64" width="264" height="960" fill="#0f1116"/>
+    <line x1="264" y1="64" x2="264" y2="1024" stroke="#1a1d24"/>
+    <text x="24" y="112" font-family="Inter, Roboto, Arial" font-size="12" fill="#aeb4bf">DOCS</text>
+    <rect x="16" y="128" width="232" height="40" rx="10" fill="#1e3a8a"/>
+    <text x="32" y="154" font-family="Inter, Roboto, Arial" font-size="13" fill="#ffffff" font-weight="600">Getting started</text>
+    <rect x="16" y="176" width="232" height="40" rx="10" fill="#141821"/>
+    <text x="32" y="202" font-family="Inter, Roboto, Arial" font-size="13" fill="#e3e6eb">FAQs</text>
+  </g>
+  <!-- Content -->
+  <g transform="translate(296,96)">
+    <text x="0" y="0" font-family="Inter, Roboto, Arial" font-size="20" fill="#e3e6eb" font-weight="700">Help & Docs</text>
+    <g transform="translate(0,28)">
+      <rect x="0" y="16" width="1048" height="56" rx="16" fill="#111318" stroke="#1a1d24"/>
+      <text x="20" y="51" font-family="Inter, Roboto, Arial" font-size="12" fill="#aeb4bf">Search documentation</text>
+    </g>
+    <g transform="translate(0,116)">
+      <rect x="0" y="0" width="512" height="200" rx="16" fill="#111318" stroke="#1a1d24"/>
+      <text x="20" y="36" font-family="Inter, Roboto, Arial" font-size="14" fill="#e3e6eb" font-weight="600">Getting started</text>
+      <text x="20" y="64" font-family="Inter, Roboto, Arial" font-size="12" fill="#c1c7d0">Connect a target, run a scan, and review results.</text>
+      <rect x="20" y="124" width="120" height="32" rx="10" fill="#1e3a8a"/>
+      <text x="36" y="145" font-family="Inter, Roboto, Arial" font-size="12" fill="#ffffff" font-weight="600">Open guide</text>
+    </g>
+  </g>
+</svg>

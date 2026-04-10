@@ -1,0 +1,87 @@
+{
+  "version": "2.0",
+  "framework": "MASVS",
+  "platform": "iOS",
+  "controls": {
+    "MASVS-STORAGE-1": {
+      "title": "Sensitive Data is Not Stored in App Containers",
+      "category": "Storage",
+      "level": "L1"
+    },
+    "MASVS-STORAGE-2": {
+      "title": "Sensitive Data is Not Stored Outside the App Container",
+      "category": "Storage",
+      "level": "L1"
+    },
+    "MASVS-STORAGE-3": {
+      "title": "Sensitive Data is Not Logged",
+      "category": "Storage",
+      "level": "L1"
+    },
+    "MASVS-CRYPTO-1": {
+      "title": "Strong Cryptography is Used",
+      "category": "Cryptography",
+      "level": "L1"
+    },
+    "MASVS-NETWORK-1": {
+      "title": "Data is Encrypted on the Network",
+      "category": "Network",
+      "level": "L1"
+    },
+    "MASVS-NETWORK-2": {
+      "title": "The TLS Settings are in Line with Current Best Practices",
+      "category": "Network",
+      "level": "L1"
+    },
+    "MASVS-PLATFORM-1": {
+      "title": "The App Only Requests Necessary Permissions",
+      "category": "Platform",
+      "level": "L1"
+    },
+    "MASVS-PLATFORM-2": {
+      "title": "The App Does Not Expose Sensitive Functionality to Other Apps",
+      "category": "Platform",
+      "level": "L1"
+    },
+    "MASVS-PLATFORM-3": {
+      "title": "The App Handles URLs Securely",
+      "category": "Platform",
+      "level": "L1"
+    },
+    "MASVS-CODE-4": {
+      "title": "Free Security Features are Enabled",
+      "category": "Code Quality",
+      "level": "L1"
+    },
+    "MASVS-RESILIENCE-1": {
+      "title": "The App Only Runs on Non-Jailbroken Devices",
+      "category": "Resilience",
+      "level": "R"
+    },
+    "MASVS-RESILIENCE-2": {
+      "title": "The App Prevents Debugging",
+      "category": "Resilience",
+      "level": "R"
+    },
+    "MASVS-RESILIENCE-3": {
+      "title": "The App Checks its own Integrity",
+      "category": "Resilience",
+      "level": "R"
+    },
+    "MASVS-RESILIENCE-4": {
+      "title": "The App Impements Anti-Dynamic Analysis",
+      "category": "Resilience",
+      "level": "R"
+    },
+    "MASVS-PRIVACY-1": {
+      "title": "The App Minimizes Access to Sensitive Data and Resources",
+      "category": "Privacy",
+      "level": "P"
+    },
+    "MASVS-SUPPLY-CHAIN-1": {
+      "title": "The App Only Uses Up-to-Date and Trusted Components",
+      "category": "Supply Chain",
+      "level": "L1"
+    }
+  }
+}

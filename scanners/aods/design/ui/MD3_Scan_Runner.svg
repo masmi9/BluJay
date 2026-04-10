@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1024" viewBox="0 0 1440 1024">
+  <defs>
+    <style>
+      .bg { fill: #0b0c0f; }
+      .surface { fill: #111318; }
+      .outline { stroke: #1a1d24; stroke-width: 1; }
+      .text { fill: #e3e6eb; font-family: 'Inter', 'Roboto', Arial, sans-serif; }
+      .muted { fill: #aeb4bf; font-family: 'Inter', 'Roboto', Arial, sans-serif; }
+      .accent { fill: #86b6ff; }
+    </style>
+  </defs>
+  <rect class="bg" width="1440" height="1024"/>
+  <!-- App bar and drawer -->
+  <g>
+    <rect class="surface outline" x="0" y="0" width="1440" height="64"/>
+    <text class="text" x="88" y="40" font-size="18" font-weight="600">AODS — Scan Runner</text>
+  </g>
+  <g>
+    <rect class="surface outline" x="0" y="64" width="240" height="960"/>
+  </g>
+  <!-- Wizard content -->
+  <g>
+    <rect class="surface outline" x="256" y="88" width="1152" height="848" rx="16"/>
+    <text class="text" x="280" y="120" font-size="18" font-weight="600">Setup Target</text>
+    <text class="muted" x="280" y="150" font-size="12">Enter a URL or package path</text>
+    <rect x="280" y="164" width="560" height="40" rx="8" fill="#0f1116" stroke="#22262f"/>
+    <text class="muted" x="292" y="188" font-size="12">https://app.example.com</text>
+
+    <text class="text" x="280" y="236" font-size="16" font-weight="600">Profile</text>
+    <rect x="280" y="252" width="160" height="36" rx="18" fill="#1f2a3a"/>
+    <text class="text" x="320" y="276" font-size="12">Full OWASP</text>
+    <rect x="448" y="252" width="160" height="36" rx="18" fill="#2a2f3a"/>
+    <text class="muted" x="492" y="276" font-size="12">Quick Scan</text>
+
+    <text class="text" x="280" y="328" font-size="16" font-weight="600">Options</text>
+    <rect x="280" y="348" width="1088" height="160" rx="12" fill="#0f1116" stroke="#22262f"/>
+    <text class="muted" x="296" y="372" font-size="12">Timeouts • Budgets • Device profile • Feature flags</text>
+
+    <rect x="1168" y="876" width="160" height="44" rx="22" class="accent"/>
+    <text class="bg" x="1216" y="905" font-size="14" font-weight="600">Start Scan</text>
+  </g>
+</svg>

@@ -1,0 +1,34 @@
+# AODS CI/CD Pipeline Target List
+# Phase 13: Enterprise Batch Processing - CI/CD Integration
+#
+# This file contains targets for automated CI/CD pipeline scanning.
+# One target per line, comments start with #
+
+# Production applications (highest priority)
+/builds/production/mobile_app_v2.1.0.apk
+/builds/production/admin_app_v1.5.2.apk
+
+# Staging applications
+/builds/staging/mobile_app_v2.2.0-beta.apk
+/builds/staging/web_app_bundle.zip
+
+# Development builds
+/builds/dev/mobile_app_latest.apk
+/builds/dev/api_service.jar
+
+# Third-party components for security review
+/vendor/third_party_sdk_v3.1.apk
+/vendor/analytics_library.aar
+
+# Web application endpoints for dynamic analysis
+https://staging-api.company.com
+https://dev-api.company.com
+
+# Source code directories for static analysis
+/source/mobile_app/src/
+/source/web_api/src/
+/source/common_libraries/
+
+# Configuration files and manifests
+/configs/production/AndroidManifest.xml
+/configs/staging/app_config.json

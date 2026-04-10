@@ -1,0 +1,80 @@
+# IODS iOS Remediation Templates
+# Keyed by CWE ID
+
+remediation_templates:
+  CWE-312:
+    "Store sensitive data in iOS Keychain with kSecAttrAccessibleWhenUnlockedThisDeviceOnly.
+    Never store passwords, tokens, or keys in NSUserDefaults, files, or databases without encryption."
+  CWE-295:
+    "Implement proper SSL/TLS certificate validation. Do not override NSURLSessionDelegate to accept
+    all certificates. Use certificate pinning (NSPinnedDomains or TrustKit) for high-security endpoints."
+  CWE-327:
+    "Replace weak cryptographic algorithms (DES, 3DES, RC4) with AES-256-GCM.
+    Use Apple CryptoKit for modern, type-safe cryptography in Swift."
+  CWE-328:
+    "Replace MD5 and SHA-1 with SHA-256 or SHA-3. For password hashing, use PBKDF2, bcrypt, or Argon2
+    via CryptoKit or CommonCrypto."
+  CWE-321:
+    "Remove hardcoded cryptographic keys. Generate keys using SecKeyGeneratePair or
+    CryptoKit's SymmetricKey.generate(). Store derived keys in Keychain."
+  CWE-259:
+    "Remove hardcoded credentials from source code and binaries.
+    Use server-side configuration, environment variables, or Keychain for credential storage."
+  CWE-319:
+    "Enforce HTTPS for all network communication. Enable App Transport Security (ATS) in Info.plist
+    and remove NSAllowsArbitraryLoads. Reject plain HTTP connections."
+  CWE-922:
+    "Apply NSFileProtectionComplete to all sensitive files using
+    FileManager.default.setAttributes([.protectionKey: FileProtectionType.complete], forItemAtPath:).
+    Never use NSFileProtectionNone for sensitive data."
+  CWE-532:
+    "Remove NSLog calls from production code using #if DEBUG guards.
+    Use os_log with %{private} format specifier for sensitive data in debug builds."
+  CWE-200:
+    "Minimize data exposure in logs, clipboard, error messages, and screenshots.
+    Use UITextField.isSecureTextEntry = true for sensitive input fields."
+  CWE-693:
+    "Implement jailbreak and anti-debugging detection for high-security apps.
+    Use multiple independent checks (file existence, fork test, sysctl) to improve bypass resistance."
+  CWE-494:
+    "Enable all binary hardening options in Xcode: PIE (-fPIE), Stack Smashing Protection
+    (-fstack-protector-all), ARC, and symbol stripping for release builds."
+  CWE-749:
+    "Migrate from UIWebView to WKWebView. Validate all JavaScript bridge messages.
+    Restrict navigation to trusted URLs using WKNavigationDelegate."
+  CWE-272:
+    "Remove development entitlements (get-task-allow) from production builds.
+    Use separate provisioning profiles for development and distribution."
+  CWE-338:
+    "Use SecRandomCopyBytes for cryptographically secure random numbers.
+    Never use rand() or arc4random() for security-critical randomness."
+  CWE-94:
+    "Never inject unsanitized user input into evaluateJavaScript.
+    Use WKScriptMessageHandler for bidirectional JavaScript-to-native communication."
+  CWE-120:
+    "Replace unsafe C string functions (sprintf, strcpy, strcat) with bounds-checked alternatives
+    (snprintf, strlcpy, strlcat) or NSString equivalents."
+  CWE-78:
+    "Never call system() or popen() with user-controlled input.
+    Use NSTask/Process for controlled subprocess execution."
+  CWE-134:
+    "Never use user-controlled input as NSString format string.
+    Use @\"%@\" as a literal format string with the user input as an argument."
+  CWE-939:
+    "Validate all URL scheme parameters before processing.
+    Migrate to Universal Links (HTTPS-based) to prevent URL scheme hijacking."
+  CWE-311:
+    "Encrypt sensitive data at rest using Keychain, NSFileProtectionComplete, or SQLCipher.
+    Declare encryption usage correctly in Info.plist (ITSAppUsesNonExemptEncryption)."
+  CWE-326:
+    "Require TLS 1.2 or higher for all network connections.
+    Remove NSExceptionMinimumTLSVersion exceptions for TLS 1.0/1.1."
+  CWE-540:
+    "Strip debug symbols from release builds: Build Settings → Strip Debug Symbols During Copy = Yes.
+    Set Strip Style to 'All Symbols' for App Store builds."
+  CWE-416:
+    "Enable Automatic Reference Counting (ARC) in Xcode Build Settings.
+    Audit legacy manual retain/release code for use-after-free vulnerabilities."
+  CWE-1395:
+    "Regularly update all third-party dependencies using 'pod update' or 'swift package update'.
+    Monitor CVE databases for vulnerabilities in embedded SDKs."

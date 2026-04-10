@@ -1,0 +1,23 @@
+{
+  "model_name": "optimized_fp_reducer",
+  "trained_at": "2026-03-15T14:26:27",
+  "version": "4.0.0",
+  "feature_type": "structured",
+  "dataset": "dataset_combined_v5",
+  "metrics": {
+    "accuracy": 0.9957,
+    "precision": 0.9985,
+    "recall": 0.9969,
+    "f1_score": 0.9977,
+    "roc_auc": 0.9998,
+    "optimal_threshold": 0.65,
+    "train_time_seconds": 4.4,
+    "train_samples": 8380,
+    "val_samples": 2096,
+    "val_tp": 1942,
+    "val_fp": 3,
+    "val_tn": 145,
+    "val_fn": 6,
+    "fpr": 0.0203
+  }
+}

@@ -1,0 +1,515 @@
+# MITRE ATT&CK Mobile Mappings Configuration
+# ==========================================
+# 
+# Centralized configuration for MITRE ATT&CK framework mappings
+# Used by ThreatAnalysisEnhancer and SecurityFrameworkMapper
+#
+# Version: 1.0.0
+# Last Updated: 2025-01-07
+# Schema Version: mitre_mappings_v1
+
+metadata:
+  version: "1.0.0"
+  schema_version: "mitre_mappings_v1"
+  last_updated: "2025-01-07T04:45:00Z"
+  description: "MITRE ATT&CK Mobile framework mappings for AODS vulnerability analysis"
+  maintainer: "AODS Architecture Team"
+  
+# CWE to MITRE ATT&CK Technique Mappings
+cwe_mitre_mappings:
+  # Injection Vulnerabilities
+  CWE-89:  # SQL Injection
+    techniques: ["T1575"]  # Native Code
+    description: "SQL injection can lead to native code execution"
+    confidence: 0.9
+    
+  CWE-79:  # Cross-Site Scripting
+    techniques: ["T1575"]  # Native Code
+    description: "XSS can execute malicious scripts in WebView contexts"
+    confidence: 0.8
+    
+  CWE-94:  # Code Injection
+    techniques: ["T1575"]  # Native Code
+    description: "Direct code injection enables native execution"
+    confidence: 0.95
+    
+  CWE-78:  # OS Command Injection
+    techniques: ["T1575"]  # Native Code
+    description: "Command injection leads to system-level execution"
+    confidence: 0.9
+    
+  # Information Disclosure
+  CWE-200:  # Information Exposure
+    techniques: ["T1533"]  # Data from Local System
+    description: "Information disclosure enables data collection"
+    confidence: 0.85
+    
+  CWE-532:  # Information Exposure Through Log Files
+    techniques: ["T1533"]  # Data from Local System
+    description: "Log file exposure reveals sensitive data"
+    confidence: 0.8
+    
+  # Storage Vulnerabilities
+  CWE-312:  # Cleartext Storage of Sensitive Information
+    techniques: ["T1533"]  # Data from Local System
+    description: "Cleartext storage enables unauthorized data access"
+    confidence: 0.9
+    
+  CWE-922:  # Insecure Storage of Sensitive Information
+    techniques: ["T1533"]  # Data from Local System
+    description: "Insecure storage mechanisms allow data extraction"
+    confidence: 0.85
+    
+  # Cryptographic Issues
+  CWE-327:  # Use of a Broken or Risky Cryptographic Algorithm
+    techniques: ["T1533", "T1437"]  # Data Collection + C2
+    description: "Weak crypto enables data interception and C2"
+    confidence: 0.8
+    
+  CWE-328:  # Reversible One-Way Hash
+    techniques: ["T1533"]  # Data from Local System
+    description: "Weak hashing allows credential recovery"
+    confidence: 0.75
+    
+  # Authentication & Authorization
+  CWE-798:  # Use of Hard-coded Credentials
+    techniques: ["T1411"]  # Input Capture
+    description: "Hardcoded credentials enable persistent access"
+    confidence: 0.9
+    
+  CWE-287:  # Improper Authentication
+    techniques: ["T1411"]  # Input Capture
+    description: "Authentication bypass enables credential access"
+    confidence: 0.85
+    
+  # Network Security
+  CWE-295:  # Improper Certificate Validation
+    techniques: ["T1437"]  # Standard Application Layer Protocol
+    description: "Certificate validation bypass enables C2"
+    confidence: 0.8
+    
+  CWE-319:  # Cleartext Transmission of Sensitive Information
+    techniques: ["T1437"]  # Standard Application Layer Protocol
+    description: "Cleartext transmission enables network interception"
+    confidence: 0.85
+    
+  # Platform-Specific
+  CWE-926:  # Improper Export of Android Application Components
+    techniques: ["T1404"]  # Exploitation for Privilege Escalation
+    description: "Component export enables privilege escalation"
+    confidence: 0.8
+    
+  CWE-925:  # Improper Verification of Cryptographic Signature
+    techniques: ["T1404"]  # Exploitation for Privilege Escalation
+    description: "Signature bypass enables privilege escalation"
+    confidence: 0.75
+    
+  # Input Validation
+  CWE-22:  # Improper Limitation of a Pathname to a Restricted Directory
+    techniques: ["T1533"]  # Data from Local System
+    description: "Path traversal enables file system access"
+    confidence: 0.8
+    
+  CWE-611:  # Improper Restriction of XML External Entity Reference
+    techniques: ["T1575"]  # Native Code
+    description: "XXE can lead to code execution"
+    confidence: 0.7
+    
+  # Deserialization
+  CWE-502:  # Deserialization of Untrusted Data
+    techniques: ["T1575"]  # Native Code
+    description: "Unsafe deserialization enables code execution"
+    confidence: 0.85
+    
+  # Generic Protection Mechanism Failure
+  CWE-693:  # Protection Mechanism Failure
+    techniques: ["T1575"]  # Native Code
+    description: "Protection bypass can enable various attack techniques"
+    confidence: 0.6
+
+# MITRE ATT&CK Mobile Techniques Database
+mitre_techniques:
+  T1575:  # Native Code
+    name: "Native Code"
+    tactic: "Execution"
+    description: "Adversaries may directly interact with the native OS application programming interface (API) to execute behaviors."
+    platforms: ["Android", "iOS"]
+    data_sources: ["API monitoring", "System calls"]
+    mitigations: 
+      - "Application isolation"
+      - "Code signing"
+      - "Runtime application self-protection"
+    detection_methods:
+      - "Native API monitoring"
+      - "Behavioral analysis"
+      - "System call analysis"
+    sub_techniques: []
+    
+  T1406:  # Obfuscated Files or Information
+    name: "Obfuscated Files or Information"
+    tactic: "Defense Evasion"
+    description: "Adversaries may attempt to make an executable or file difficult to discover or analyze."
+    platforms: ["Android", "iOS"]
+    data_sources: ["File monitoring", "Process monitoring"]
+    mitigations:
+      - "Static analysis"
+      - "Dynamic analysis"
+      - "Code review"
+    detection_methods:
+      - "Entropy analysis"
+      - "String analysis"
+      - "Behavioral analysis"
+    sub_techniques: []
+    
+  T1628:  # Hide Artifacts
+    name: "Hide Artifacts"
+    tactic: "Defense Evasion"
+    description: "Adversaries may attempt to hide artifacts associated with their behaviors."
+    platforms: ["Android", "iOS"]
+    data_sources: ["File system monitoring", "Process monitoring"]
+    mitigations:
+      - "File integrity monitoring"
+      - "Application sandboxing"
+    detection_methods:
+      - "File system analysis"
+      - "Process tree analysis"
+    sub_techniques: []
+    
+  T1533:  # Data from Local System
+    name: "Data from Local System"
+    tactic: "Collection"
+    description: "Adversaries may search local system sources, such as file systems or local databases."
+    platforms: ["Android", "iOS"]
+    data_sources: ["File monitoring", "Process monitoring"]
+    mitigations:
+      - "Data encryption"
+      - "Access controls"
+      - "Application sandboxing"
+    detection_methods:
+      - "File access monitoring"
+      - "Data flow analysis"
+    sub_techniques: []
+    
+  T1411:  # Input Capture
+    name: "Input Capture"
+    tactic: "Credential Access"
+    description: "Adversaries may use methods of capturing user input to obtain credentials."
+    platforms: ["Android", "iOS"]
+    data_sources: ["API monitoring", "Application logs"]
+    mitigations:
+      - "Input validation"
+      - "Secure input methods"
+      - "Multi-factor authentication"
+    detection_methods:
+      - "API call monitoring"
+      - "Behavioral analysis"
+    sub_techniques: []
+    
+  T1404:  # Exploitation for Privilege Escalation
+    name: "Exploitation for Privilege Escalation"
+    tactic: "Privilege Escalation"
+    description: "Adversaries may exploit software vulnerabilities in an attempt to elevate privileges."
+    platforms: ["Android", "iOS"]
+    data_sources: ["System calls", "Process monitoring"]
+    mitigations:
+      - "Regular updates"
+      - "Exploit mitigations"
+      - "Principle of least privilege"
+    detection_methods:
+      - "Exploit detection"
+      - "Privilege monitoring"
+    sub_techniques: []
+    
+  T1437:  # Standard Application Layer Protocol
+    name: "Standard Application Layer Protocol"
+    tactic: "Command and Control"
+    description: "Adversaries may communicate using application layer protocols."
+    platforms: ["Android", "iOS"]
+    data_sources: ["Network traffic", "Packet capture"]
+    mitigations:
+      - "Network monitoring"
+      - "Traffic filtering"
+      - "Certificate pinning"
+    detection_methods:
+      - "Protocol analysis"
+      - "Traffic pattern analysis"
+    sub_techniques: []
+
+  # --- Mobile Malware-Specific Techniques ---
+
+  T1516:  # Input Injection
+    name: "Input Injection"
+    tactic: "Defense Evasion"
+    description: "Adversaries may inject input to the UI to perform actions, such as overlay attacks to steal credentials."
+    platforms: ["Android"]
+    data_sources: ["API monitoring", "Accessibility service monitoring"]
+    mitigations:
+      - "Overlay detection"
+      - "Google Play Protect"
+      - "User education"
+    detection_methods:
+      - "Overlay window monitoring"
+      - "Accessibility service abuse detection"
+    sub_techniques: []
+
+  T1417:  # Input Capture
+    name: "Input Capture"
+    tactic: "Credential Access"
+    description: "Adversaries may capture user input via keylogging or GUI input capture using accessibility services."
+    platforms: ["Android", "iOS"]
+    data_sources: ["API monitoring", "Accessibility events"]
+    mitigations:
+      - "Secure keyboard"
+      - "Anti-keylogging"
+      - "Accessibility service restrictions"
+    detection_methods:
+      - "Accessibility service monitoring"
+      - "Input method monitoring"
+    sub_techniques:
+      - "T1417.001"  # Keylogging
+      - "T1417.002"  # GUI Input Capture
+
+  T1582:  # SMS Control
+    name: "SMS Control"
+    tactic: "Collection"
+    description: "Adversaries may intercept, redirect, or block SMS messages to steal OTPs or prevent notifications."
+    platforms: ["Android"]
+    data_sources: ["SMS logs", "Broadcast receiver monitoring"]
+    mitigations:
+      - "App-based 2FA instead of SMS"
+      - "SMS permission restrictions"
+    detection_methods:
+      - "SMS broadcast receiver monitoring"
+      - "Default SMS app changes"
+    sub_techniques: []
+
+  T1624:  # Event Triggered Execution
+    name: "Event Triggered Execution"
+    tactic: "Persistence"
+    description: "Adversaries may establish persistence through system event triggers such as accessibility services or broadcast receivers."
+    platforms: ["Android"]
+    data_sources: ["Accessibility service logs", "Broadcast receivers"]
+    mitigations:
+      - "Accessibility service audit"
+      - "Boot receiver review"
+    detection_methods:
+      - "Service monitoring"
+      - "Boot receiver analysis"
+    sub_techniques:
+      - "T1624.001"  # Broadcast Receivers
+
+  T1402:  # Broadcast Receivers
+    name: "Broadcast Receivers"
+    tactic: "Persistence"
+    description: "Adversaries may use broadcast receivers to execute code on boot or in response to system events."
+    platforms: ["Android"]
+    data_sources: ["Manifest analysis", "Runtime receiver registration"]
+    mitigations:
+      - "Manifest auditing"
+      - "Permission review"
+    detection_methods:
+      - "Boot receiver enumeration"
+      - "Dynamic receiver monitoring"
+    sub_techniques: []
+
+  T1429:  # Audio Capture
+    name: "Audio Capture"
+    tactic: "Collection"
+    description: "Adversaries may capture audio from the device microphone for surveillance."
+    platforms: ["Android", "iOS"]
+    data_sources: ["Microphone API monitoring", "Permission usage"]
+    mitigations:
+      - "Microphone permission control"
+      - "Hardware indicators"
+    detection_methods:
+      - "MediaRecorder/AudioRecord API monitoring"
+      - "Background audio detection"
+    sub_techniques: []
+
+  T1512:  # Video Capture
+    name: "Video Capture"
+    tactic: "Collection"
+    description: "Adversaries may capture video from the device camera or screen via MediaProjection."
+    platforms: ["Android", "iOS"]
+    data_sources: ["Camera API monitoring", "MediaProjection monitoring"]
+    mitigations:
+      - "Camera permission control"
+      - "Hardware indicators"
+    detection_methods:
+      - "Camera/MediaProjection API monitoring"
+      - "Screen recording detection"
+    sub_techniques: []
+
+  T1430:  # Location Tracking
+    name: "Location Tracking"
+    tactic: "Collection"
+    description: "Adversaries may track device location using GPS, network, or passive providers."
+    platforms: ["Android", "iOS"]
+    data_sources: ["Location API monitoring", "Permission usage"]
+    mitigations:
+      - "Location permission control"
+      - "Background location restrictions"
+    detection_methods:
+      - "LocationManager API monitoring"
+      - "Background location requests"
+    sub_techniques: []
+
+  T1636:  # Protected User Data
+    name: "Protected User Data"
+    tactic: "Collection"
+    description: "Adversaries may access protected user data such as contacts, SMS, and call logs."
+    platforms: ["Android", "iOS"]
+    data_sources: ["Content provider access", "Permission usage"]
+    mitigations:
+      - "Runtime permission control"
+      - "Content provider restrictions"
+    detection_methods:
+      - "Content resolver monitoring"
+      - "Permission grant tracking"
+    sub_techniques:
+      - "T1636.001"  # Contact List
+      - "T1636.002"  # Call Log
+      - "T1636.003"  # SMS Messages
+
+  T1471:  # Data Encrypted for Impact
+    name: "Data Encrypted for Impact"
+    tactic: "Impact"
+    description: "Adversaries may encrypt files on the device to extort payment (ransomware)."
+    platforms: ["Android"]
+    data_sources: ["File system monitoring", "Crypto API monitoring"]
+    mitigations:
+      - "Regular backups"
+      - "Device admin restrictions"
+    detection_methods:
+      - "Mass file encryption detection"
+      - "Cipher API monitoring"
+    sub_techniques: []
+
+  T1418:  # Software Discovery
+    name: "Software Discovery"
+    tactic: "Discovery"
+    description: "Adversaries may query installed applications to identify banking/financial targets."
+    platforms: ["Android", "iOS"]
+    data_sources: ["Package manager queries", "API monitoring"]
+    mitigations:
+      - "Package visibility restrictions (Android 11+)"
+    detection_methods:
+      - "PackageManager query monitoring"
+    sub_techniques: []
+
+  T1496:  # Resource Hijacking
+    name: "Resource Hijacking"
+    tactic: "Impact"
+    description: "Adversaries may use device CPU/GPU resources to mine cryptocurrency without user consent."
+    platforms: ["Android", "iOS"]
+    data_sources: ["CPU usage monitoring", "Network traffic", "Battery consumption"]
+    mitigations:
+      - "Performance monitoring"
+      - "Battery usage alerts"
+      - "Network traffic analysis"
+    detection_methods:
+      - "Sustained high CPU usage detection"
+      - "Stratum protocol detection"
+      - "Mining pool connection monitoring"
+      - "WebView JavaScript mining detection"
+    sub_techniques: []
+
+# Vulnerability Pattern to MITRE Technique Mappings
+pattern_mitre_mappings:
+  obfuscat: ["T1406"]
+  encrypt: ["T1533"]
+  credential: ["T1411"]
+  privilege: ["T1404"]
+  network: ["T1437"]
+  storage: ["T1533"]
+  injection: ["T1575"]
+  authentication: ["T1411"]
+  authorization: ["T1404"]
+  communication: ["T1437"]
+  data: ["T1533"]
+  file: ["T1533"]
+  log: ["T1533"]
+  debug: ["T1628"]
+  hide: ["T1628"]
+  steganography: ["T1628"]
+
+# Threat Actor Database
+threat_actors:
+  APT-Mobile-1:
+    actor_id: "APT-Mobile-1"
+    name: "Mobile Phantom"
+    aliases: ["PhantomMobile", "GhostApp"]
+    description: "Advanced persistent threat group targeting mobile applications"
+    sophistication_level: "high"
+    primary_motivation: "espionage"
+    target_sectors: ["government", "finance", "healthcare"]
+    techniques_used: ["T1575", "T1406", "T1533", "T1411"]
+    attribution_confidence: 0.8
+    
+  Cybercrime-Mobile-1:
+    actor_id: "Cybercrime-Mobile-1"
+    name: "DataHarvester"
+    aliases: ["MobileThief", "InfoStealer"]
+    description: "Cybercriminal group focused on mobile data theft"
+    sophistication_level: "medium"
+    primary_motivation: "financial"
+    target_sectors: ["retail", "finance", "social"]
+    techniques_used: ["T1533", "T1411", "T1437"]
+    attribution_confidence: 0.7
+
+# Threat Campaign Database
+threat_campaigns:
+  Operation-MobileStorm:
+    campaign_id: "Operation-MobileStorm"
+    name: "Operation Mobile Storm"
+    description: "Large-scale mobile malware campaign targeting financial apps"
+    first_seen: "2024-10-01T00:00:00Z"
+    last_seen: "2024-12-25T00:00:00Z"
+    associated_actors: ["Cybercrime-Mobile-1"]
+    techniques_used: ["T1575", "T1533", "T1411"]
+    target_platforms: ["Android"]
+    indicators: ["malicious-domain.com", "suspicious-app-signature"]
+    
+  APT-Mobile-Campaign-2024:
+    campaign_id: "APT-Mobile-Campaign-2024"
+    name: "Silent Mobile Infiltration"
+    description: "Sophisticated APT campaign using advanced evasion techniques"
+    first_seen: "2024-06-15T00:00:00Z"
+    last_seen: "2025-01-01T00:00:00Z"
+    associated_actors: ["APT-Mobile-1"]
+    techniques_used: ["T1406", "T1628", "T1533", "T1575"]
+    target_platforms: ["Android", "iOS"]
+    indicators: ["stealth-c2-server.net", "advanced-obfuscation-pattern"]
+
+# Configuration Validation Schema
+validation:
+  required_fields:
+    cwe_mitre_mappings: ["techniques", "description", "confidence"]
+    mitre_techniques: ["name", "tactic", "description", "platforms", "mitigations", "detection_methods"]
+    threat_actors: ["actor_id", "name", "sophistication_level", "techniques_used"]
+    threat_campaigns: ["campaign_id", "name", "techniques_used", "target_platforms"]
+  
+  confidence_range: [0.0, 1.0]
+  
+  valid_tactics:
+    - "Initial Access"
+    - "Execution"
+    - "Persistence"
+    - "Privilege Escalation"
+    - "Defense Evasion"
+    - "Credential Access"
+    - "Discovery"
+    - "Collection"
+    - "Command and Control"
+    - "Exfiltration"
+    - "Impact"
+  
+  valid_platforms:
+    - "Android"
+    - "iOS"
+    - "Cross-Platform"
+
+
+
+
+

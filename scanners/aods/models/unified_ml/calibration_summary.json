@@ -1,0 +1,14 @@
+{
+  "method": "temperature_scaling",
+  "temperature": 1.8,
+  "ece_before": 0.21,
+  "ece_after": 0.042,
+  "mce_before": 0.35,
+  "mce_after": 0.08,
+  "ece_before_val": 0.21,
+  "ece_after_val": 0.042,
+  "n_samples": 577,
+  "n_bins": 10,
+  "improvement_pct": 80.0,
+  "generated": "2026-01-27T17:29:04.585919+00:00"
+}

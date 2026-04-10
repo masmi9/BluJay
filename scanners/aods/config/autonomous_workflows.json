@@ -1,0 +1,47 @@
+{
+  "workflows": [
+    {
+      "workflow_id": "critical_vulnerability_response",
+      "name": "Critical Vulnerability Response",
+      "description": "Automated response to critical vulnerabilities",
+      "trigger_conditions": {
+        "event_type": "vulnerability_detected",
+        "severity": "critical"
+      },
+      "priority": "critical",
+      "actions": [
+        {
+          "action_id": "notify_security_team",
+          "action_type": "notification",
+          "description": "Notify security team immediately",
+          "parameters": {
+            "channels": [
+              "slack",
+              "email"
+            ],
+            "urgency": "critical"
+          }
+        },
+        {
+          "action_id": "create_incident",
+          "action_type": "escalation",
+          "description": "Create security incident",
+          "parameters": {
+            "priority": "P1",
+            "assignee": "security-team"
+          }
+        }
+      ]
+    }
+  ],
+  "optimization_rules": [
+    {
+      "rule_id": "reduce_notification_spam",
+      "condition": "notification_frequency > 10_per_hour",
+      "action": "batch_notifications",
+      "parameters": {
+        "batch_interval_minutes": 15
+      }
+    }
+  ]
+}
