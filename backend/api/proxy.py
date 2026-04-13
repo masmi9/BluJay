@@ -42,6 +42,52 @@ def _make_cert_handler(cert_path):
     return CertHandler
 
 
+@router.post("/internal/flow", include_in_schema=False)
+async def internal_flow(data: dict, db: AsyncSession = Depends(get_db)):
+    """Receives a captured flow from the mitmdump addon and persists + fans it out."""
+    from api.router import get_proxy_manager
+    from models.session import ProxyFlow
+    from datetime import datetime
+    import json
+
+    session_id = data.get("session_id", 0)
+    timestamp_raw = data.get("timestamp")
+    timestamp = datetime.fromisoformat(timestamp_raw) if timestamp_raw else datetime.utcnow()
+
+    req_headers = data.get("request_headers", {})
+    resp_headers = data.get("response_headers", {})
+
+    pf = ProxyFlow(
+        id=data["id"],
+        session_id=session_id,
+        timestamp=timestamp,
+        method=data.get("method"),
+        url=data.get("url"),
+        host=data.get("host"),
+        path=data.get("path"),
+        request_headers=json.dumps(req_headers) if isinstance(req_headers, dict) else req_headers,
+        request_body=(data.get("request_body") or "").encode(),
+        response_status=data.get("response_status"),
+        response_headers=json.dumps(resp_headers) if isinstance(resp_headers, dict) else resp_headers,
+        response_body=(data.get("response_body") or "").encode(),
+        tls=data.get("tls", False),
+        content_type=data.get("content_type"),
+        duration_ms=data.get("duration_ms"),
+    )
+
+    try:
+        db.add(pf)
+        await db.commit()
+    except Exception:
+        await db.rollback()
+
+    # Fan out to WebSocket subscribers
+    summary = {k: v for k, v in data.items() if k not in ("request_body", "response_body")}
+    get_proxy_manager().push_flow(session_id, summary)
+
+    return {"ok": True}
+
+
 @router.post("/start")
 async def start_proxy(body: ProxyStartRequest, db: AsyncSession = Depends(get_db)):
     from api.router import get_proxy_manager
@@ -281,8 +327,14 @@ async def get_local_ip():
     # Remove loopback
     candidates = [ip for ip in candidates if not ip.startswith("127.")]
 
-    # Score: prefer 192.168.x.x > 10.x.x.x > 172.16-31.x.x > everything else
+    # Score: prefer real Wi-Fi subnets; deprioritize known VM/virtual adapters
+    # VirtualBox host-only defaults: 192.168.56.x, 192.168.99.x
+    # VMware host-only defaults: 192.168.232.x, 192.168.133.x
+    _VM_SUBNETS = ("192.168.56.", "192.168.99.", "192.168.232.", "192.168.133.")
+
     def _score(ip: str) -> int:
+        if any(ip.startswith(s) for s in _VM_SUBNETS):
+            return 5  # deprioritize VM/VirtualBox host-only adapters
         if ip.startswith("192.168."):
             return 0
         if ip.startswith("10."):

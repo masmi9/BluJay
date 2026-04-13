@@ -12,5 +12,5 @@ export function useProxyFlows(sessionId: number | null) {
     }
   }, [addFlow])
 
-  useWebSocket(sessionId ? `/ws/proxy/${sessionId}` : null, onMessage)
+  useWebSocket(sessionId != null ? `/ws/proxy/${sessionId}` : null, onMessage)
 }

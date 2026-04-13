@@ -1,17 +1,19 @@
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Search, Radio, Zap, Terminal, Shield, FlaskConical, Settings, Lock, Key, Crosshair, KeyRound } from 'lucide-react'
+import { LayoutDashboard, Search, Radio, Zap, Terminal, Shield, FlaskConical, Settings, Lock, Key, Crosshair, KeyRound, Radar, Brain } from 'lucide-react'
 import { clsx } from 'clsx'
 
 const NAV = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/proxy', icon: Radio, label: 'Proxy' },
   { to: '/frida', icon: Zap, label: 'Frida' },
+  { to: '/owasp', icon: Shield, label: 'OWASP Scanner' },
+  { to: '/agent', icon: Terminal, label: 'Agent Console' },
   { to: '/tls', icon: Lock, label: 'TLS Audit' },
   { to: '/jwt', icon: Key, label: 'JWT Testing' },
   { to: '/fuzzing', icon: Crosshair, label: 'API Fuzzing' },
   { to: '/brute-force', icon: KeyRound, label: 'Brute Force' },
-  { to: '/owasp', icon: Shield, label: 'OWASP Scanner' },
-  { to: '/agent', icon: Terminal, label: 'Agent Console' },
+  { to: '/strix', icon: Radar, label: 'Strix Pentest' },
+  { to: '/ai-triage', icon: Brain, label: 'AI Triage' },
   { to: '/testing', icon: FlaskConical, label: 'Testing Lab' },
   { to: '/settings', icon: Settings, label: 'Settings' },
 ]

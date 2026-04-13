@@ -18,6 +18,8 @@ import JwtPage from '@/pages/JwtPage'
 import RiskPage from '@/pages/RiskPage'
 import FuzzingPage from '@/pages/FuzzingPage'
 import BruteForcePage from '@/pages/BruteForcePage'
+import StrixPage from '@/pages/StrixPage'
+import AiTriagePage from '@/pages/AiTriagePage'
 
 export default function App() {
   return (
@@ -44,6 +46,8 @@ export default function App() {
               <Route path="/risk/:id" element={<RiskPage />} />
               <Route path="/fuzzing" element={<FuzzingPage />} />
               <Route path="/brute-force" element={<BruteForcePage />} />
+              <Route path="/strix" element={<StrixPage />} />
+              <Route path="/ai-triage" element={<AiTriagePage />} />
               <Route path="/ipa" element={<Navigate to="/owasp" replace />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

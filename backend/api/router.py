@@ -19,6 +19,8 @@ from api.fuzzing import router as fuzzing_router
 from api.brute_force import router as brute_force_router
 from api.ipa import router as ipa_router
 from api.ios_devices import router as ios_devices_router
+from api.ollama import router as ollama_router
+from api.strix import router as strix_router
 
 api_router = APIRouter()
 api_router.include_router(analysis_router, prefix="/analyses", tags=["analysis"])
@@ -40,6 +42,8 @@ api_router.include_router(fuzzing_router, prefix="/fuzzing", tags=["fuzzing"])
 api_router.include_router(brute_force_router, prefix="/brute-force", tags=["brute-force"])
 api_router.include_router(ipa_router, prefix="/ipa", tags=["ipa"])
 api_router.include_router(ios_devices_router, prefix="/ios-devices", tags=["ios"])
+api_router.include_router(ollama_router, prefix="/ollama", tags=["ollama"])
+api_router.include_router(strix_router, prefix="/strix", tags=["strix"])
 
 # Singletons initialised lazily (so imports don't fail before lifespan runs)
 _proxy_manager = None

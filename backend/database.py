@@ -36,6 +36,9 @@ async def init_db() -> None:
         await _migrate_table(conn, "owasp_scans", [
             ("platform", "VARCHAR NOT NULL DEFAULT 'android'"),
         ])
+        await _migrate_table(conn, "dynamic_sessions", [
+            ("platform", "TEXT NOT NULL DEFAULT 'android'"),
+        ])
 
 
 async def _migrate_table(conn, table: str, new_columns: list[tuple[str, str]]) -> None:

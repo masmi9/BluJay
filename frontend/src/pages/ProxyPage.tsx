@@ -259,6 +259,7 @@ export default function ProxyPage() {
         <IosSetupPanel
           iosDevices={iosDevices}
           localIp={localIp}
+          allIps={allIps}
           proxyPort={proxyPort}
           proxyRunning={running}
           onClose={() => setIosSetupOpen(false)}
@@ -345,9 +346,10 @@ function CopyButton({ text }: { text: string }) {
   )
 }
 
-function IosSetupPanel({ iosDevices, localIp, proxyPort, proxyRunning, onClose }: {
+function IosSetupPanel({ iosDevices, localIp, allIps, proxyPort, proxyRunning, onClose }: {
   iosDevices: IosDeviceInfo[]
   localIp: string
+  allIps: string[]
   proxyPort: number
   proxyRunning: boolean
   onClose: () => void
@@ -355,8 +357,14 @@ function IosSetupPanel({ iosDevices, localIp, proxyPort, proxyRunning, onClose }
   const [certServerRunning, setCertServerRunning] = useState(false)
   const [certServerPort, setCertServerPort] = useState(8888)
   const [certServerError, setCertServerError] = useState<string | null>(null)
+  const [selectedIp, setSelectedIp] = useState(localIp)
 
-  const certLanUrl = certServerRunning ? `http://${localIp}:${certServerPort}/cert` : null
+  // Sync selectedIp when localIp loads (async query)
+  useEffect(() => {
+    if (localIp && localIp !== '…') setSelectedIp(localIp)
+  }, [localIp])
+
+  const certLanUrl = certServerRunning ? `http://${selectedIp}:${certServerPort}/cert` : null
   const anyJailbroken = iosDevices.some((d) => d.jailbroken)
 
   const startCertServer = async () => {
@@ -427,6 +435,20 @@ function IosSetupPanel({ iosDevices, localIp, proxyPort, proxyRunning, onClose }
                 <p className="text-xs text-zinc-500">
                   Start a LAN cert server so your iPhone can download the cert directly over Wi-Fi.
                 </p>
+                {allIps.length > 1 && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-zinc-600 shrink-0">Interface</span>
+                    <select
+                      className="flex-1 bg-bg-elevated border border-bg-border rounded px-2 py-1 text-xs font-mono text-zinc-300 focus:outline-none focus:border-accent"
+                      value={selectedIp}
+                      onChange={(e) => setSelectedIp(e.target.value)}
+                    >
+                      {allIps.map((ip) => (
+                        <option key={ip} value={ip}>{ip}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <div className="flex items-center gap-2">
                   <input
                     type="number"
@@ -491,8 +513,8 @@ function IosSetupPanel({ iosDevices, localIp, proxyPort, proxyRunning, onClose }
               <div className="flex items-center gap-2">
                 <span className="text-xs text-zinc-600 w-12 shrink-0">Server</span>
                 <div className="flex items-center gap-1 bg-bg-elevated border border-bg-border rounded px-2 py-1 flex-1">
-                  <span className="text-xs font-mono text-zinc-300">{localIp}</span>
-                  <CopyButton text={localIp} />
+                  <span className="text-xs font-mono text-zinc-300">{selectedIp}</span>
+                  <CopyButton text={selectedIp} />
                 </div>
               </div>
               <div className="flex items-center gap-2">
