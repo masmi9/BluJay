@@ -153,6 +153,25 @@ async def ws_jwt_brute(ws: WebSocket, test_id: int):
     await _ws_send_loop(ws, queue)
 
 
+# --- API test progress ---
+
+@ws_router.websocket("/api-testing/{test_id}")
+async def ws_api_test(ws: WebSocket, test_id: int):
+    await ws.accept()
+    from core.api_test_engine import get_test_queue
+    queue = None
+    for _ in range(20):
+        queue = get_test_queue(test_id)
+        if queue:
+            break
+        await asyncio.sleep(0.25)
+    if queue is None:
+        await ws.send_text(json.dumps({"type": "error", "message": "No active test"}))
+        await ws.close()
+        return
+    await _ws_send_loop(ws, queue)
+
+
 # --- OWASP scan progress ---
 
 @ws_router.websocket("/owasp/{scan_id}")

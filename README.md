@@ -14,9 +14,14 @@ A mobile application security analysis platform for Android and iOS. BluJay comb
 ### Network & API
 - **TLS Audit** — Validate certificate pinning and TLS configuration
 - **JWT Testing** — Decode, forge, and test JWT tokens from intercepted traffic
-- **API Fuzzing** — Fuzz discovered API endpoints for IDOR, auth bypass, verb tampering, and rate-limit issues
+- **API Testing** — Active API security test suite for IDOR sweeps, auth stripping, token replay, and cross-user authorization checks. Dynamically activated by linking a proxy session — flows are parsed automatically to extract auth contexts, resource IDs, and suggested tests. Includes a full integrated API fuzzer (verb tampering, auth bypass, rate-limit detection) in the same module.
 - **Brute Force** — Credential stuffing and rate-limit testing against login endpoints
 - **Strix Pentest Agent** — Autonomous AI-driven pentesting of backend targets (APIs, servers) discovered during mobile analysis. Runs multi-agent recon → exploit → PoC validation in a Docker sandbox. Findings are proof-of-concept validated before being reported.
+
+### Static Analysis Improvements
+- **iOS Risk Scoring** — Calibrated risk scorer (denominator 1000) prevents score inflation on large commercial binaries
+- **iOS Finding Enrichment** — All iOS findings now carry `impact`, `attack_path`, and `evidence` fields. Rule IDs cover ATS misconfigurations, binary secrets, entitlement abuse, insecure frameworks, and sensitive permissions
+- **Binary String Deduplication** — Scanner deduplicates findings per pattern (max 3 examples each) so a single binary with hundreds of weak-crypto references doesn't skew the risk score
 
 ### AI & Reporting
 - **AI Triage** — Local AI-powered vulnerability analysis using metatron-qwen (fine-tuned Qwen via Ollama). No cloud, no API keys. Accepts output from any scan module and returns severity classification, OWASP MASVS mapping, and remediation steps. Includes consolidated session reports that correlate findings across all modules and identify attack chains.
@@ -27,6 +32,49 @@ A mobile application security analysis platform for Android and iOS. BluJay comb
 - **Dashboard** — Android (ADB) and iOS (libimobiledevice) device management, one-click Pull & Analyze
 - **WebView Inspector** — Detect and audit WebView configurations in running apps
 - **Screenshot Capture** — Capture device screenshots during dynamic sessions
+
+## How API Testing Works
+
+The API Testing module is designed around the idea that the proxy is doing the reconnaissance — you don't need to manually enter URLs.
+
+```
+Proxy Session (traffic capture)
+        │
+        ▼
+Build from Proxy Flows  →  Extracts auth tokens, resource IDs, URL patterns
+        │
+        ▼
+Suggested Tests  →  IDOR Sweep, Auth Strip, Token Replay, Cross-User Auth
+        │
+        ▼
+Run Test  →  WebSocket streams live results back to the UI
+        │
+        ▼
+Export vulnerable findings  →  Saved to Static Findings (same as OWASP results)
+```
+
+### Test Types
+
+| Type | What it does |
+|------|-------------|
+| **IDOR Sweep** | Takes an endpoint with a resource ID in the URL/params, replays with 25 foreign IDs, flags responses that return data |
+| **Auth Strip** | Sends the request three ways: with original auth, without any auth header, and with a mangled token. Flags if no-auth or mangled returns data |
+| **Token Replay** | Captures a valid token, pauses and waits for you to log out of the app, then replays the token — detects missing server-side session invalidation |
+| **Cross-User Auth** | With two or more captured auth contexts, swaps Account B's token on Account A's resource — detects BOLA (Broken Object Level Authorization) |
+
+### Dynamic Activation
+
+Navigate to `/api-testing?session=N` to link the module to an active proxy session. The left panel shows a green "Session #N active" indicator. When you click **Build from Proxy Flows**, the backend:
+
+1. Scans all captured proxy flows for that session
+2. Extracts auth headers (`Authorization`, `X-Auth-Token`, session cookies, etc.)
+3. Normalizes URL patterns (digits → `{id}`)
+4. Extracts ID-bearing parameters (Snowflake IDs, `user_id`, `object_id`, etc.)
+5. Returns suggested tests with pre-filled URLs and headers
+
+### Fuzzer Tab
+
+The **Fuzzer** tab inside API Testing is the full API fuzzer — enter a session ID or analysis ID, select attack types, and start a fuzz job. Results stream live and are stored alongside your test suite history.
 
 ## How Strix and AI Triage Work Together
 
@@ -179,7 +227,7 @@ Key endpoint groups:
 
 | Prefix | Description |
 |--------|-------------|
-| `/analyses` | Static analysis (APK/IPA) |
+| `/analyses` | Static analysis (APK/IPA upload + device pull) |
 | `/sessions` | Dynamic analysis sessions |
 | `/proxy` | Proxy flows, replay, repeater |
 | `/frida` | Dynamic instrumentation |
@@ -187,10 +235,13 @@ Key endpoint groups:
 | `/strix` | Autonomous pentest scans |
 | `/ollama` | AI triage (metatron-qwen) |
 | `/cve` | CVE correlation |
-| `/fuzzing` | API fuzzing jobs |
+| `/api-testing` | API test suites, tests, results, fuzzing |
+| `/fuzzing` | Standalone API fuzzing jobs |
 | `/tls` | TLS audit |
 | `/jwt` | JWT testing |
 | `/brute-force` | Brute force jobs |
+| `/ios-devices` | iOS device management + pull-and-analyze |
+| `/devices` | Android (ADB) device management |
 
 ## Workspace
 

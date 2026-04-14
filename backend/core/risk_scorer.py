@@ -60,8 +60,10 @@ async def compute_risk_score(analysis_id: int, db) -> dict:
         raw_score += int(SEVERITY_WEIGHTS.get(sev, 0) * cnt * 0.5)  # CVEs count at half weight
 
     # Normalize to 0-100 (cap denominator at a reasonable maximum)
-    # Denominator: assume 50 critical findings = max score
-    denominator = 50 * SEVERITY_WEIGHTS["critical"]
+    # Denominator: assume 100 critical findings = max score.
+    # Commercial apps produce high raw scores from binary/permission scanning;
+    # calibrated at 100 criticals so large apps don't all saturate at 100/100.
+    denominator = 100 * SEVERITY_WEIGHTS["critical"]
     score = min(int((raw_score / denominator) * MAX_SCORE), MAX_SCORE)
 
     breakdown = {

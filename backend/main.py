@@ -29,6 +29,7 @@ import models.tls_audit   # noqa: F401
 import models.jwt_test    # noqa: F401
 import models.fuzzing      # noqa: F401
 import models.brute_force  # noqa: F401
+import models.api_testing   # noqa: F401
 
 logger = structlog.get_logger()
 

@@ -6,6 +6,7 @@ analyzes ATS config, and persists StaticFinding rows tagged platform="ios".
 from __future__ import annotations
 
 import asyncio
+import json
 import plistlib
 import re
 import zipfile
@@ -120,6 +121,135 @@ _PRIVACY_KEYS: dict[str, tuple[str, str]] = {
 }
 
 
+# rule_id mappings — must match keys in finding_enricher._ENRICHMENTS
+_ATS_RULE_IDS: dict[str, str] = {
+    "NSAllowsArbitraryLoads": "ios_ats_allows_arbitrary_loads",
+    "NSAllowsArbitraryLoadsForMedia": "ios_ats_allows_media",
+    "NSAllowsArbitraryLoadsInWebContent": "ios_ats_allows_web_content",
+    "NSExceptionAllowsInsecureHTTPLoads": "ios_ats_domain_exception",
+}
+
+_ATS_DESCRIPTIONS: dict[str, str] = {
+    "NSAllowsArbitraryLoads": (
+        "NSAllowsArbitraryLoads disables App Transport Security globally, permitting unencrypted "
+        "HTTP connections to all domains. Session tokens, credentials, and user data may be "
+        "transmitted without encryption."
+    ),
+    "NSAllowsArbitraryLoadsForMedia": (
+        "NSAllowsArbitraryLoadsForMedia disables ATS for media URLs, allowing unencrypted "
+        "HTTP streaming content to be loaded."
+    ),
+    "NSAllowsArbitraryLoadsInWebContent": (
+        "NSAllowsArbitraryLoadsInWebContent disables ATS for content loaded inside WKWebView, "
+        "allowing mixed HTTP/HTTPS pages."
+    ),
+    "NSExceptionAllowsInsecureHTTPLoads": (
+        "A per-domain ATS exception permits unencrypted HTTP to the specified domain, exposing "
+        "traffic to that host to on-path interception."
+    ),
+}
+
+_ENTITLEMENT_RULE_IDS: dict[str, str] = {
+    "com.apple.private.security.no-sandbox": "ios_entitlement_no_sandbox",
+    "get-task-allow": "ios_entitlement_get_task_allow",
+    "com.apple.developer.icloud-services": "ios_entitlement_icloud",
+}
+
+_ENTITLEMENT_DESCRIPTIONS: dict[str, str] = {
+    "com.apple.private.security.no-sandbox": (
+        "The app sandbox is fully disabled. The app can access files outside its container "
+        "and interact with system resources normally restricted to privileged processes."
+    ),
+    "get-task-allow": (
+        "The binary is marked as debuggable via the get-task-allow entitlement. An attacker "
+        "with local device access can attach LLDB to the running process and inspect memory, "
+        "extract secrets, or bypass control flow."
+    ),
+    "com.apple.developer.icloud-services": (
+        "The app is entitled for iCloud services. Verify that data synced to iCloud does not "
+        "include sensitive credentials or session tokens."
+    ),
+}
+
+_FRAMEWORK_RULE_IDS: dict[str, str] = {
+    "WebKit": "ios_framework_webkit",
+    "JavaScriptCore": "ios_framework_webkit",
+    "OpenSSL": "ios_framework_openssl",
+    "libcrypto": "ios_framework_openssl",
+    "AFNetworking": "ios_framework_networking",
+    "Alamofire": "ios_framework_networking",
+}
+
+_PERMISSION_RULE_IDS: dict[str, str] = {
+    "NSLocationAlwaysAndWhenInUseUsageDescription": "perm_access_fine_location",
+    "NSLocationAlwaysUsageDescription": "perm_access_fine_location",
+    "NSLocationWhenInUseUsageDescription": "perm_access_fine_location",
+    "NSCameraUsageDescription": "perm_camera",
+    "NSMicrophoneUsageDescription": "perm_record_audio",
+    "NSContactsUsageDescription": "perm_read_contacts",
+    "NSHealthShareUsageDescription": "ios_perm_health",
+    "NSHealthUpdateUsageDescription": "ios_perm_health",
+    "NSUserTrackingUsageDescription": "ios_perm_tracking",
+}
+
+_BINARY_RULE_IDS: dict[str, str] = {
+    "API key in binary strings": "ios_binary_api_key",
+    "Password in binary strings": "ios_binary_password",
+    "Private key in binary": "ios_binary_private_key",
+    "Hardcoded URL in binary": "ios_binary_hardcoded_url",
+    "Token in binary strings": "ios_binary_token",
+    "AWS credentials in binary": "ios_binary_aws_credentials",
+    "Credential in binary strings": "ios_binary_credential",
+    "Weak cryptography reference in binary": "ios_binary_weak_crypto",
+    "Hardcoded IP address in binary": "ios_binary_hardcoded_ip",
+    "Database file reference in binary": "ios_binary_database_reference",
+}
+
+_BINARY_DESCRIPTIONS: dict[str, str] = {
+    "API key in binary strings": (
+        "A potential API key was found embedded in the app binary. Hardcoded credentials can be "
+        "extracted from any IPA file using `strings` — no jailbreak or device access required."
+    ),
+    "Password in binary strings": (
+        "A potential hardcoded password was found in the app binary. Passwords embedded in "
+        "binaries are trivially extractable and may allow direct access to backend services."
+    ),
+    "Private key in binary": (
+        "A private key (RSA/EC/PEM) is embedded in the binary. It can be extracted to impersonate "
+        "the server, decrypt TLS traffic, or forge signed tokens."
+    ),
+    "Hardcoded URL in binary": (
+        "A hardcoded URL was found in the binary. This may reveal internal API endpoints, staging "
+        "environments, or infrastructure details not intended to be public."
+    ),
+    "Token in binary strings": (
+        "A session or bearer token was found hardcoded in the binary. Hardcoded tokens may grant "
+        "authenticated API access without valid credentials."
+    ),
+    "AWS credentials in binary": (
+        "AWS access key credentials are hardcoded in the binary. These can be extracted from any "
+        "IPA file and used to access AWS resources directly."
+    ),
+    "Credential in binary strings": (
+        "Hardcoded credentials (private key or client secret) were found in the binary. They can "
+        "be extracted without device access."
+    ),
+    "Weak cryptography reference in binary": (
+        "References to deprecated or broken cryptographic algorithms (MD5, RC4, DES) were found "
+        "in the binary. Data protected with these primitives provides significantly weaker security "
+        "than modern alternatives."
+    ),
+    "Hardcoded IP address in binary": (
+        "A hardcoded internal IP address was found, potentially revealing network topology or "
+        "internal infrastructure ranges."
+    ),
+    "Database file reference in binary": (
+        "A local database file reference was found. Unencrypted SQLite databases are accessible "
+        "in plaintext on jailbroken devices or from device backups."
+    ),
+}
+
+
 def _norm(name: str) -> str:
     """Normalize zip entry path separators to forward slashes."""
     return name.replace("\\", "/")
@@ -146,18 +276,21 @@ def _parse_ats(info_plist: dict) -> tuple[dict, list[dict]]:
     ats = info_plist.get("NSAppTransportSecurity", {})
     findings = []
 
-    def _check(d: dict, context: str = ""):
+    def _check(d: dict, domain: str = ""):
         for key, (sev, msg) in _ATS_RISK_KEYS.items():
             if d.get(key) is True:
+                ctx = f"NSAppTransportSecurity > NSExceptionDomains > {domain} > {key}" if domain else f"NSAppTransportSecurity > {key}"
                 findings.append({
                     "severity": sev,
                     "title": msg,
+                    "description": _ATS_DESCRIPTIONS.get(key, msg),
                     "category": "ios_ats",
                     "file_path": "Info.plist",
-                    "evidence": f"{context}{key}: true",
+                    "rule_id": _ATS_RULE_IDS.get(key),
+                    "evidence": json.dumps({"match": f"{key}: true", "context": ctx}),
                 })
-        for domain, exc in d.get("NSExceptionDomains", {}).items():
-            _check(exc, context=f"{domain}: ")
+        for dom, exc in d.get("NSExceptionDomains", {}).items():
+            _check(exc, domain=dom)
 
     _check(ats)
     return ats, findings
@@ -192,20 +325,37 @@ def _extract_entitlements(app_path: str, zf: zipfile.ZipFile) -> list[dict]:
 
 
 def _scan_binary_strings(binary_data: bytes) -> list[dict]:
-    findings = []
+    # Deduplicate by pattern title — collect up to 3 example matches each.
+    # Without deduplication a large binary generates hundreds of "Weak cryptography
+    # reference" findings (one per string containing "MD5"), which inflates the score.
+    seen: dict[str, dict] = {}  # title → {severity, examples[]}
+
     strings = _STRINGS_RE.findall(binary_data)
     for s in strings:
         text = s.decode(errors="replace")
         for pattern, sev, title in _SECRET_PATTERNS:
             if pattern.search(text):
-                findings.append({
-                    "severity": sev,
-                    "title": title,
-                    "category": "ios_binary",
-                    "file_path": "<binary>",
-                    "evidence": text[:200],
-                })
-                break  # one match per string
+                if title not in seen:
+                    seen[title] = {"severity": sev, "examples": []}
+                if len(seen[title]["examples"]) < 3:
+                    seen[title]["examples"].append(text[:300])
+                break  # one pattern match per string
+
+    findings = []
+    for title, data in seen.items():
+        examples = data["examples"]
+        findings.append({
+            "severity": data["severity"],
+            "title": title,
+            "description": _BINARY_DESCRIPTIONS.get(title, title),
+            "category": "ios_binary",
+            "file_path": "<binary>",
+            "rule_id": _BINARY_RULE_IDS.get(title),
+            "evidence": json.dumps({
+                "match": examples[0] if examples else "",
+                "context": "\n---\n".join(examples),
+            }),
+        })
     return findings
 
 
@@ -340,7 +490,6 @@ async def run_ipa_analysis(
 
             # ATS
             _push("ats", 35, "Analyzing ATS config…")
-            import json as _j
             ats_dict, ats_findings = _parse_ats(info_plist)
 
             # Entitlements
@@ -400,7 +549,7 @@ async def run_ipa_analysis(
         analysis.platform = "ios"
         analysis.bundle_id = bundle_id
         analysis.min_ios_version = str(min_ios) if min_ios else None
-        analysis.ats_config_json = _j.dumps(ats_dict)
+        analysis.ats_config_json = json.dumps(ats_dict)
 
         all_findings = ats_findings + binary_findings
         for ent in entitlements:
@@ -408,9 +557,14 @@ async def run_ipa_analysis(
                 all_findings.append({
                     "severity": ent["risk_level"],
                     "title": ent["description"],
+                    "description": _ENTITLEMENT_DESCRIPTIONS.get(ent["key"], ent["description"]),
                     "category": "ios_entitlement",
                     "file_path": "embedded.mobileprovision",
-                    "evidence": f"{ent['key']} = {ent['value']}",
+                    "rule_id": _ENTITLEMENT_RULE_IDS.get(ent["key"]),
+                    "evidence": json.dumps({
+                        "match": f"{ent['key']} = {ent['value']}",
+                        "context": f"Entitlement: {ent['key']} = {ent['value']}",
+                    }),
                 })
 
         for fw in framework_results:
@@ -418,9 +572,14 @@ async def run_ipa_analysis(
                 all_findings.append({
                     "severity": fw["risk_level"],
                     "title": f"{fw['name']} framework detected",
+                    "description": f"{fw['name']} is bundled with the app. {fw['note']}",
                     "category": "ios_framework",
                     "file_path": f"Frameworks/{fw['name']}.framework",
-                    "evidence": fw["note"],
+                    "rule_id": _FRAMEWORK_RULE_IDS.get(fw["name"]),
+                    "evidence": json.dumps({
+                        "match": fw["name"],
+                        "context": fw["note"],
+                    }),
                 })
 
         permissions = _parse_permissions(info_plist)
@@ -429,9 +588,17 @@ async def run_ipa_analysis(
                 all_findings.append({
                     "severity": perm["risk_level"],
                     "title": f"Sensitive permission: {perm['description']}",
+                    "description": (
+                        f"The app declares {perm['key']}, requesting access to {perm['description'].lower()}. "
+                        f"Usage justification: \"{perm['usage_string']}\""
+                    ),
                     "category": "ios_permission",
                     "file_path": "Info.plist",
-                    "evidence": perm["usage_string"],
+                    "rule_id": _PERMISSION_RULE_IDS.get(perm["key"]),
+                    "evidence": json.dumps({
+                        "match": perm["key"],
+                        "context": f"{perm['key']}: {perm['usage_string']}",
+                    }),
                 })
 
         for f in all_findings:
@@ -440,9 +607,10 @@ async def run_ipa_analysis(
                 category=f.get("category", "ios"),
                 severity=f["severity"],
                 title=f["title"],
-                description=f["title"],
+                description=f.get("description") or f["title"],
                 file_path=f.get("file_path"),
                 evidence=f.get("evidence"),
+                rule_id=f.get("rule_id"),
             ))
 
         analysis.status = "complete"
