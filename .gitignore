@@ -30,6 +30,11 @@ scanners/iods/output/
 frontend/node_modules/
 frontend/dist/
 
+# Scanner UI node_modules
+scanners/**/node_modules/
+scanners/**/dist/
+scanners/**/build/
+
 # Tools (downloaded by setup scripts)
 tools/
 
