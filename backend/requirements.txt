@@ -6,7 +6,7 @@ alembic==1.13.1
 pydantic>=2.7.2
 pydantic-settings>=2.5.2
 aiofiles==23.2.1
-python-multipart==0.0.9
+python-multipart==0.0.26
 mitmproxy==10.3.1
 frida==16.7.19
 frida-tools==13.7.1
