@@ -13,7 +13,7 @@ frida-tools==13.7.1
 objection==1.12.0
 androguard
 yara-python==4.5.1
-cryptography==44.0.3
+cryptography==46.0.7
 httpx>=0.27.1
 anyio>=4.5
 structlog==24.1.0
