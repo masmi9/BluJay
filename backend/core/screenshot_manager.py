@@ -1,9 +1,10 @@
 """
-Screenshot capture via ADB and storage management.
+Screenshot capture via ADB (Android) or idevicescreenshot (iOS) and storage management.
 """
 import asyncio
 import base64
 import io
+import tempfile
 from datetime import datetime
 from pathlib import Path
 
@@ -13,8 +14,18 @@ from PIL import Image
 logger = structlog.get_logger()
 
 
-async def capture_screenshot(serial: str) -> bytes:
-    """Run `adb exec-out screencap -p` and return raw PNG bytes."""
+async def capture_screenshot(serial: str, platform: str = "android") -> bytes:
+    """Capture a screenshot and return raw PNG bytes.
+
+    Android: uses `adb exec-out screencap -p`
+    iOS:     uses `idevicescreenshot -u <udid> <tmpfile>`
+    """
+    if platform == "ios":
+        return await _capture_ios(serial)
+    return await _capture_android(serial)
+
+
+async def _capture_android(serial: str) -> bytes:
     from config import settings
 
     proc = await asyncio.create_subprocess_exec(
@@ -28,6 +39,39 @@ async def capture_screenshot(serial: str) -> bytes:
     if not stdout:
         raise RuntimeError("adb screencap returned empty output")
     return stdout
+
+
+async def _capture_ios(udid: str) -> bytes:
+    from config import settings
+
+    # idevicescreenshot writes to a file — use a temp path
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+        tmp_path = Path(tmp.name)
+
+    tool = settings.libimobiledevice_dir / "idevicescreenshot"
+    # On Windows the binary has .exe extension
+    if not tool.exists():
+        tool = settings.libimobiledevice_dir / "idevicescreenshot.exe"
+    if not tool.exists():
+        raise RuntimeError(
+            "idevicescreenshot not found — ensure libimobiledevice is installed at "
+            f"{settings.libimobiledevice_dir}"
+        )
+
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            str(tool), "-u", udid, str(tmp_path),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        _, stderr = await proc.communicate()
+        if proc.returncode != 0:
+            raise RuntimeError(f"idevicescreenshot failed: {stderr.decode(errors='replace')}")
+        if not tmp_path.exists() or tmp_path.stat().st_size == 0:
+            raise RuntimeError("idevicescreenshot produced no output")
+        return tmp_path.read_bytes()
+    finally:
+        tmp_path.unlink(missing_ok=True)
 
 
 def save_screenshot(session_id: int, data: bytes, label: str, workspace_dir: Path) -> tuple[Path, str]:

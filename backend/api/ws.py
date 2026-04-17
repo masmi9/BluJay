@@ -172,6 +172,44 @@ async def ws_api_test(ws: WebSocket, test_id: int):
     await _ws_send_loop(ws, queue)
 
 
+# --- Objection terminal (bidirectional) ---
+
+@ws_router.websocket("/objection/{session_id}")
+async def ws_objection(ws: WebSocket, session_id: str):
+    await ws.accept()
+    from api.objection import get_objection_manager
+    mgr = get_objection_manager()
+    queue = mgr.subscribe(session_id)
+
+    async def _send_output():
+        try:
+            while True:
+                try:
+                    msg = await asyncio.wait_for(queue.get(), timeout=30)
+                    await ws.send_text(json.dumps(msg, default=str))
+                    if msg.get("type") == "exit":
+                        break
+                except asyncio.TimeoutError:
+                    await ws.send_text(json.dumps({"type": "ping"}))
+        except (WebSocketDisconnect, Exception):
+            pass
+
+    async def _recv_input():
+        try:
+            while True:
+                raw = await ws.receive_text()
+                msg = json.loads(raw)
+                if msg.get("type") == "input":
+                    await mgr.send_command(session_id, msg.get("data", ""))
+        except (WebSocketDisconnect, Exception):
+            pass
+
+    try:
+        await asyncio.gather(_send_output(), _recv_input())
+    finally:
+        mgr.unsubscribe(session_id, queue)
+
+
 # --- OWASP scan progress ---
 
 @ws_router.websocket("/owasp/{scan_id}")

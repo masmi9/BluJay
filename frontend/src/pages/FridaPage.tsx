@@ -1,11 +1,12 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Virtuoso } from 'react-virtuoso'
-import { Zap, Play, Square, Trash2, ChevronDown, ChevronRight, Save, X, BookOpen, RefreshCw, Search } from 'lucide-react'
+import { Zap, Play, Square, Trash2, ChevronDown, ChevronRight, Save, X, BookOpen, RefreshCw, Search, Terminal, StopCircle, Send } from 'lucide-react'
 import { clsx } from 'clsx'
 import Editor from '@monaco-editor/react'
 import { fridaApi } from '@/api/frida'
 import { iosApi } from '@/api/ios'
+import { objectionApi } from '@/api/objection'
 import { useDeviceStore } from '@/store/deviceStore'
 import { useFridaStore } from '@/store/fridaStore'
 import { useFridaEvents } from '@/hooks/useFridaEvents'
@@ -34,6 +35,269 @@ function loadSaved(): SavedScript[] {
 function persistSaved(scripts: SavedScript[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(scripts))
 }
+
+// Strip ANSI escape codes for plain-text display
+function stripAnsi(str: string): string {
+  return str.replace(/\x1b\[[0-9;]*[mGKHF]/g, '')
+}
+
+// ─── Objection Panel ────────────────────────────────────────────────────────
+
+function ObjectionPanel({ serial }: { serial: string }) {
+  const [sessionId, setSessionId] = useState<string | null>(null)
+  const [gadget, setGadget] = useState('')
+  // Serial is optional — leave blank to let frida auto-detect the USB device
+  const [deviceSerial, setDeviceSerial] = useState('')
+  const [lines, setLines] = useState<string[]>([])
+  const [input, setInput] = useState('')
+  const [history, setHistory] = useState<string[]>([])
+  const [histIdx, setHistIdx] = useState(-1)
+  const [starting, setStarting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const outputRef = useRef<HTMLDivElement>(null)
+  const wsRef = useRef<WebSocket | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const apiBase = (window as any).__API_BASE__ ?? ''
+  const wsBase = apiBase.replace(/^http/, 'ws')
+
+  const appendLine = useCallback((text: string) => {
+    setLines((prev) => [...prev, stripAnsi(text)])
+  }, [])
+
+  // Auto-scroll to bottom on new output
+  useEffect(() => {
+    if (outputRef.current) {
+      outputRef.current.scrollTop = outputRef.current.scrollHeight
+    }
+  }, [lines])
+
+  // Connect WebSocket when session starts
+  useEffect(() => {
+    if (!sessionId) return
+
+    const ws = new WebSocket(`${wsBase}/ws/objection/${sessionId}`)
+    wsRef.current = ws
+
+    ws.onmessage = (e) => {
+      try {
+        const msg = JSON.parse(e.data)
+        if (msg.type === 'output' && msg.data) appendLine(msg.data)
+        if (msg.type === 'exit' && msg.data) {
+          appendLine(msg.data)
+          setSessionId(null)
+        }
+      } catch {}
+    }
+    ws.onerror = () => appendLine('\n[WebSocket error — connection lost]\n')
+    ws.onclose = () => {}
+
+    return () => {
+      ws.close()
+      wsRef.current = null
+    }
+  }, [sessionId, wsBase, appendLine])
+
+  const startSession = async () => {
+    if (!gadget.trim()) return
+    setStarting(true)
+    setError(null)
+    setLines([])
+    try {
+      const sess = await objectionApi.start(gadget.trim(), deviceSerial.trim() || undefined)
+      setSessionId(sess.session_id)
+      appendLine(`[objection] starting session for ${gadget}${deviceSerial.trim() ? ` on device ${deviceSerial.trim()}` : ' (auto-detect device)'}\n`)
+    } catch (e: any) {
+      setError(e?.response?.data?.detail ?? e?.message ?? 'Failed to start objection')
+    } finally {
+      setStarting(false)
+    }
+  }
+
+  const stopSession = async () => {
+    if (!sessionId) return
+    wsRef.current?.close()
+    await objectionApi.stop(sessionId)
+    setSessionId(null)
+    appendLine('\n[session stopped]\n')
+  }
+
+  const sendCommand = () => {
+    if (!input.trim() || !sessionId || !wsRef.current) return
+    const cmd = input.trim()
+    // Echo the command locally
+    appendLine(`objection> ${cmd}\n`)
+    wsRef.current.send(JSON.stringify({ type: 'input', data: cmd }))
+    setHistory((h) => [cmd, ...h.slice(0, 99)])
+    setHistIdx(-1)
+    setInput('')
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') { sendCommand(); return }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      const next = Math.min(histIdx + 1, history.length - 1)
+      setHistIdx(next)
+      setInput(history[next] ?? '')
+    }
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      const next = Math.max(histIdx - 1, -1)
+      setHistIdx(next)
+      setInput(next === -1 ? '' : history[next] ?? '')
+    }
+  }
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Toolbar */}
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-bg-border bg-bg-surface shrink-0 flex-wrap">
+        <Terminal size={14} className={sessionId ? 'text-green-400' : 'text-zinc-500'} />
+        <span className="text-xs font-semibold text-zinc-300">Objection</span>
+        {sessionId && (
+          <span className="text-xs text-zinc-400 font-mono">attached → {gadget}</span>
+        )}
+        <div className="flex-1" />
+        {!sessionId ? (
+          <>
+            <input
+              className="bg-bg-elevated border border-bg-border rounded px-2 py-1.5 text-xs text-zinc-200 w-56 placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
+              placeholder="Bundle ID / package name"
+              value={gadget}
+              onChange={(e) => setGadget(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') startSession() }}
+            />
+            <input
+              className="bg-bg-elevated border border-bg-border rounded px-2 py-1.5 text-xs text-zinc-200 w-40 placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
+              placeholder="Device serial (optional)"
+              value={deviceSerial}
+              onChange={(e) => setDeviceSerial(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') startSession() }}
+              title="Leave blank to auto-detect USB device"
+            />
+            <button
+              onClick={startSession}
+              disabled={!gadget.trim() || starting}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium bg-green-500/20 text-green-400 hover:bg-green-500/30 disabled:opacity-40 transition-colors"
+            >
+              <Play size={12} /> {starting ? 'Starting…' : 'Start'}
+            </button>
+          </>
+        ) : (
+          <button
+            onClick={stopSession}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
+          >
+            <StopCircle size={12} /> Stop
+          </button>
+        )}
+        <button
+          onClick={() => setLines([])}
+          className="p-1.5 text-zinc-500 hover:text-zinc-200 rounded hover:bg-bg-elevated"
+          title="Clear output"
+        >
+          <Trash2 size={13} />
+        </button>
+      </div>
+
+      {error && (
+        <div className="px-4 py-2 text-xs text-red-400 bg-red-500/10 border-b border-red-500/20 shrink-0">
+          {error}
+        </div>
+      )}
+
+      {/* Terminal output */}
+      <div
+        ref={outputRef}
+        className="flex-1 overflow-auto bg-bg-base font-mono text-xs text-zinc-300 p-3 whitespace-pre-wrap break-all"
+        onClick={() => inputRef.current?.focus()}
+      >
+        {lines.length === 0 ? (
+          <span className="text-zinc-600">
+            {sessionId
+              ? 'Waiting for objection output…'
+              : 'Enter a bundle ID or package name above and click Start to launch an objection session.'}
+          </span>
+        ) : (
+          lines.map((line, i) => (
+            <span
+              key={i}
+              className={
+                line.startsWith('objection>')
+                  ? 'text-yellow-400'
+                  : line.startsWith('[objection]') || line.startsWith('[session')
+                  ? 'text-zinc-500'
+                  : 'text-zinc-300'
+              }
+            >
+              {line}
+            </span>
+          ))
+        )}
+      </div>
+
+      {/* Command input */}
+      <div className="flex items-center gap-2 px-3 py-2 border-t border-bg-border bg-bg-surface shrink-0">
+        <span className="text-xs text-yellow-400 font-mono shrink-0">objection&gt;</span>
+        <input
+          ref={inputRef}
+          className="flex-1 bg-transparent text-xs font-mono text-zinc-200 outline-none placeholder-zinc-600"
+          placeholder={sessionId ? 'Type a command…' : 'Start a session first'}
+          value={input}
+          disabled={!sessionId}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+        />
+        <button
+          onClick={sendCommand}
+          disabled={!sessionId || !input.trim()}
+          className="p-1 text-zinc-500 hover:text-zinc-200 disabled:opacity-30"
+          title="Send (Enter)"
+        >
+          <Send size={13} />
+        </button>
+      </div>
+
+      {/* Quick command palette */}
+      {sessionId && (
+        <div className="flex flex-wrap gap-1 px-3 py-2 border-t border-bg-border bg-bg-surface shrink-0">
+          {QUICK_COMMANDS.map((qc) => (
+            <button
+              key={qc.label}
+              onClick={() => {
+                appendLine(`objection> ${qc.cmd}\n`)
+                wsRef.current?.send(JSON.stringify({ type: 'input', data: qc.cmd }))
+              }}
+              className="text-[10px] font-mono px-2 py-0.5 rounded border border-bg-border text-zinc-400 hover:border-zinc-500 hover:text-zinc-200 transition-colors"
+              title={qc.description}
+            >
+              {qc.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+const QUICK_COMMANDS = [
+  { label: 'ios ssl disable',       cmd: 'ios sslpinning disable',              description: 'Disable SSL pinning (iOS)' },
+  { label: 'ios jb disable',        cmd: 'ios jailbreak disable',               description: 'Disable jailbreak detection (iOS)' },
+  { label: 'ios keychain dump',     cmd: 'ios keychain dump',                   description: 'Dump iOS keychain entries' },
+  { label: 'ios userdefaults',      cmd: 'ios nsuserdefaults get',              description: 'Dump NSUserDefaults' },
+  { label: 'ios cookies',           cmd: 'ios cookies get',                     description: 'Dump cookies (iOS)' },
+  { label: 'ios pasteboard',        cmd: 'ios pasteboard monitor',              description: 'Monitor iOS pasteboard' },
+  { label: 'ios bundles',           cmd: 'ios bundles list_bundles',            description: 'List loaded bundles (iOS)' },
+  { label: 'env',                   cmd: 'env',                                 description: 'Show app environment & paths' },
+  { label: 'jobs list',             cmd: 'jobs list',                           description: 'List active hooks/jobs' },
+  { label: 'memory list modules',   cmd: 'memory list modules',                 description: 'List loaded modules in memory' },
+  { label: 'android ssl disable',   cmd: 'android sslpinning disable',          description: 'Disable SSL pinning (Android)' },
+  { label: 'android root disable',  cmd: 'android root disable',               description: 'Disable root detection (Android)' },
+  { label: 'android intent launch', cmd: 'android intent launch_activity',     description: 'Launch activity (Android)' },
+]
+
+// ─── Main Page ───────────────────────────────────────────────────────────────
 
 export default function FridaPage() {
   const { devices, activeSession } = useDeviceStore()
@@ -153,8 +417,44 @@ export default function FridaPage() {
     setActiveTab('editor')
   }
 
+  const [pageTab, setPageTab] = useState<'frida' | 'objection'>('frida')
+
   return (
     <div className="flex flex-col h-full">
+      {/* Page-level tab bar */}
+      <div className="flex border-b border-bg-border bg-bg-surface shrink-0">
+        <button
+          onClick={() => setPageTab('frida')}
+          className={clsx(
+            'flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium border-b-2 transition-colors',
+            pageTab === 'frida'
+              ? 'border-yellow-400 text-yellow-400'
+              : 'border-transparent text-zinc-500 hover:text-zinc-300'
+          )}
+        >
+          <Zap size={12} /> Frida
+        </button>
+        <button
+          onClick={() => setPageTab('objection')}
+          className={clsx(
+            'flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium border-b-2 transition-colors',
+            pageTab === 'objection'
+              ? 'border-green-400 text-green-400'
+              : 'border-transparent text-zinc-500 hover:text-zinc-300'
+          )}
+        >
+          <Terminal size={12} /> Objection
+        </button>
+      </div>
+
+      {/* Objection tab */}
+      {pageTab === 'objection' && (
+        <ObjectionPanel serial={selectedSerial} />
+      )}
+
+      {/* Frida tab */}
+      {pageTab === 'frida' && <div className="flex flex-col flex-1 overflow-hidden">
+
       {/* Toolbar */}
       <div className="flex flex-col gap-2 px-4 py-3 border-b border-bg-border bg-bg-surface shrink-0">
         <div className="flex items-center gap-2">
@@ -246,12 +546,12 @@ export default function FridaPage() {
             {/* Process list */}
             {!activeSession && filteredProcesses.length > 0 && (
               <div className="flex flex-wrap gap-1 max-h-20 overflow-auto">
-                {filteredProcesses.map((p) => {
+                {filteredProcesses.map((p, i) => {
                   // Frida attaches by bundle ID (iOS) or process name — prefer identifier
                   const attachTarget = p.identifier || p.name
                   return (
                     <button
-                      key={p.identifier || p.name}
+                      key={`${p.identifier || ''}-${p.name}-${p.pid ?? i}`}
                       onClick={() => setSelectedProcess(attachTarget)}
                       className={clsx(
                         'text-[10px] font-mono px-2 py-0.5 rounded border transition-colors',
@@ -421,6 +721,7 @@ export default function FridaPage() {
           )}
         </div>
       </div>
+      </div>} {/* end Frida tab */}
     </div>
   )
 }

@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Smartphone, WifiOff, Zap, X } from 'lucide-react'
 import { adbApi } from '@/api/adb'
+import { iosApi } from '@/api/ios'
 import { fridaApi } from '@/api/frida'
 import { useDeviceStore } from '@/store/deviceStore'
 import { useFridaStore } from '@/store/fridaStore'
@@ -26,7 +27,14 @@ export function TopBar() {
     refetchInterval: 5000,
   })
 
-  const connected = devices.filter((d) => d.state === 'device')
+  const { data: iosDevices = [] } = useQuery({
+    queryKey: ['ios-devices'],
+    queryFn: () => iosApi.listDevices(),
+    refetchInterval: 5000,
+  })
+
+  const connectedAndroid = devices.filter((d) => d.state === 'device')
+  const totalConnected = connectedAndroid.length + iosDevices.length
 
   return (
     <header className="h-10 flex items-center justify-between px-4 bg-bg-surface border-b border-bg-border shrink-0">
@@ -47,13 +55,24 @@ export function TopBar() {
           </div>
         )}
 
-        {connected.length > 0 ? (
-          connected.map((d) => (
-            <span key={d.serial} className="flex items-center gap-1 text-green-400">
-              <Smartphone size={12} />
-              {d.model || d.serial}
-            </span>
-          ))
+        {totalConnected > 0 ? (
+          <>
+            {connectedAndroid.map((d) => (
+              <span key={d.serial} className="flex items-center gap-1 text-green-400" title={`Android • ${d.serial}`}>
+                <Smartphone size={12} />
+                {d.model || d.serial}
+              </span>
+            ))}
+            {iosDevices.map((d) => (
+              <span key={d.udid} className="flex items-center gap-1 text-green-400" title={`iOS • ${d.udid}`}>
+                <Smartphone size={12} className="text-green-300" />
+                {d.name || d.model || d.udid}
+                {d.jailbroken && (
+                  <span className="text-yellow-400" title="Jailbroken">⚡</span>
+                )}
+              </span>
+            ))}
+          </>
         ) : (
           <span className="flex items-center gap-1 text-zinc-500">
             <WifiOff size={12} />

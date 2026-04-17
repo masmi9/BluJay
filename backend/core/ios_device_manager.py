@@ -141,33 +141,68 @@ async def pull_ipa(udid: str, bundle_id: str, output_dir: Path) -> Path:
 async def list_apps(udid: str) -> list[dict]:
     """
     Returns installed third-party apps on a connected iOS device.
-    Requires ideviceinstaller (part of libimobiledevice).
-    Output format per line: com.example.app, 1.0.0, App Display Name
+
+    Merges two sources so that apps installed via TrollStore (which bypass
+    installd and are invisible to ideviceinstaller) still appear:
+      1. ideviceinstaller -l  — standard App Store / sideloaded installs
+      2. frida enumerate_applications() — all apps visible to frida-server,
+         including TrollStore installs
     """
+    apps: dict[str, dict] = {}  # bundle_id → app dict
+
+    # --- Source 1: ideviceinstaller ---
     ideviceinstaller = _resolve_tool("ideviceinstaller")
-    if not ideviceinstaller:
-        return []
+    if ideviceinstaller:
+        rc, stdout, _ = await _run(ideviceinstaller, "-u", udid, "-l", timeout=20)
+        if rc == 0 and stdout.strip():
+            for line in stdout.splitlines():
+                line = line.strip()
+                if not line or line.startswith("Total:") or line.startswith("No apps"):
+                    continue
+                parts = [p.strip() for p in line.split(",", 2)]
+                if not parts:
+                    continue
+                bundle_id = parts[0]
+                version = parts[1] if len(parts) > 1 else ""
+                display_name = parts[2] if len(parts) > 2 else bundle_id
+                if bundle_id:
+                    apps[bundle_id] = {"bundle_id": bundle_id, "version": version, "name": display_name}
 
-    rc, stdout, _ = await _run(ideviceinstaller, "-u", udid, "-l", timeout=20)
-    if rc != 0 or not stdout.strip():
-        return []
+    # --- Source 2: Frida enumerate_applications (catches TrollStore installs) ---
+    try:
+        import frida
+        import functools
 
-    apps = []
-    for line in stdout.splitlines():
-        line = line.strip()
-        if not line or line.startswith("Total:") or line.startswith("No apps"):
-            continue
-        parts = [p.strip() for p in line.split(",", 2)]
-        if not parts:
-            continue
-        bundle_id = parts[0]
-        version = parts[1] if len(parts) > 1 else ""
-        display_name = parts[2] if len(parts) > 2 else bundle_id
-        if bundle_id:
-            apps.append({"bundle_id": bundle_id, "version": version, "name": display_name})
+        def _frida_apps() -> list[dict]:
+            try:
+                mgr = frida.get_device_manager()
+                device = mgr.get_device(udid, timeout=5)
+                result = []
+                try:
+                    entries = device.enumerate_applications(scope="full")
+                except Exception:
+                    entries = device.enumerate_applications()
+                for app in entries:
+                    identifier = getattr(app, "identifier", None) or ""
+                    if not identifier or identifier.startswith("com.apple."):
+                        continue
+                    name = app.name or identifier
+                    result.append({"bundle_id": identifier, "version": "", "name": name})
+                return result
+            except Exception:
+                return []
 
-    apps.sort(key=lambda x: x["bundle_id"].lower())
-    return apps
+        loop = asyncio.get_event_loop()
+        frida_apps = await loop.run_in_executor(None, functools.partial(_frida_apps))
+        for entry in frida_apps:
+            bid = entry["bundle_id"]
+            if bid not in apps:
+                apps[bid] = entry
+    except ImportError:
+        pass
+
+    result = sorted(apps.values(), key=lambda x: x["bundle_id"].lower())
+    return result
 
 
 async def get_devices() -> list[IosDeviceInfo]:

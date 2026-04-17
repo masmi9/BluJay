@@ -208,6 +208,13 @@ async def run_analysis(
         await _update_status("complete")
         await _emit("complete", 100, f"Analysis complete — {len(findings)} total findings")
 
+        # Auto-trigger CVE correlation now that static analysis is done
+        try:
+            from core.cve_correlator import run_cve_scan
+            asyncio.create_task(run_cve_scan(analysis_id, AsyncSessionLocal))
+        except Exception:
+            pass  # CVE scan failing must never crash the analysis pipeline
+
     except Exception as exc:
         logger.exception("Analysis pipeline error", analysis_id=analysis_id)
         await _update_status("failed", error=str(exc))

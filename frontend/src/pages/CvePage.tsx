@@ -145,10 +145,25 @@ export default function CvePage() {
         <p className="text-zinc-500 text-sm">No libraries detected. Run a scan after completing static analysis.</p>
       )}
 
-      {/* Library list */}
-      <div className="flex flex-col gap-2 overflow-auto">
-        {libs.map((lib) => (
-          <LibraryRow key={lib.id} lib={lib} matches={matches} />
+      {/* Library list grouped by ecosystem */}
+      <div className="flex flex-col gap-4 overflow-auto">
+        {Object.entries(
+          libs.reduce<Record<string, typeof libs>>((acc, lib) => {
+            const eco = lib.ecosystem || 'Unknown'
+            ;(acc[eco] ??= []).push(lib)
+            return acc
+          }, {})
+        ).sort(([a], [b]) => a.localeCompare(b)).map(([ecosystem, ecosystemLibs]) => (
+          <div key={ecosystem}>
+            <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2 px-1">
+              {ecosystem} <span className="font-normal text-zinc-600">({ecosystemLibs.length})</span>
+            </h3>
+            <div className="flex flex-col gap-2">
+              {ecosystemLibs.map((lib) => (
+                <LibraryRow key={lib.id} lib={lib} matches={matches} />
+              ))}
+            </div>
+          </div>
         ))}
       </div>
     </div>

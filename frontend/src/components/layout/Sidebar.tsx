@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Search, Radio, Zap, Terminal, Shield, FlaskConical, Settings, Lock, Key, KeyRound, Radar, Brain, TestTube2 } from 'lucide-react'
+import { LayoutDashboard, Search, Radio, Zap, Terminal, Shield, FlaskConical, Settings, Lock, Key, KeyRound, Radar, Brain, TestTube2, GitCompare, Layers } from 'lucide-react'
 import { clsx } from 'clsx'
 
 const NAV = [
@@ -14,6 +14,8 @@ const NAV = [
   { to: '/brute-force', icon: KeyRound, label: 'Brute Force' },
   { to: '/strix', icon: Radar, label: 'Strix Pentest' },
   { to: '/ai-triage', icon: Brain, label: 'AI Triage' },
+  { to: '/diff', icon: GitCompare, label: 'Diff / Change Detection' },
+  { to: '/campaigns', icon: Layers, label: 'Multi-APK Campaign' },
   { to: '/testing', icon: FlaskConical, label: 'Testing Lab' },
   { to: '/settings', icon: Settings, label: 'Settings' },
 ]

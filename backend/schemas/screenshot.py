@@ -7,6 +7,7 @@ class CaptureRequest(BaseModel):
     serial: str
     session_id: int
     label: str = ""
+    platform: str = "android"   # android | ios
 
 
 class ScreenshotOut(BaseModel):

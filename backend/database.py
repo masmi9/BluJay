@@ -1,7 +1,14 @@
+import asyncio
+from pathlib import Path
+
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
 from config import settings
+
+import structlog
+
+logger = structlog.get_logger()
 
 
 class Base(DeclarativeBase):
@@ -21,48 +28,26 @@ AsyncSessionLocal = async_sessionmaker(
 )
 
 
+def _run_migrations_sync() -> None:
+    """Run all pending Alembic migrations synchronously.
+
+    Called once at startup (inside run_in_executor so the event loop is not
+    blocked). Uses a plain sqlite+pysqlite connection — no aiosqlite needed
+    for migration time.
+    """
+    from alembic.config import Config
+    from alembic import command
+
+    ini_path = Path(__file__).parent / "alembic.ini"
+    cfg = Config(str(ini_path))
+    command.upgrade(cfg, "head")
+
+
 async def init_db() -> None:
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-        # Add columns introduced after initial schema creation.
-        # ALTER TABLE ADD COLUMN raises an error if the column already exists
-        # in SQLite, so we check existing columns first.
-        await _migrate_table(conn, "analyses", [
-            ("platform",         "VARCHAR NOT NULL DEFAULT 'android'"),
-            ("bundle_id",        "VARCHAR"),
-            ("min_ios_version",  "VARCHAR"),
-            ("ats_config_json",  "TEXT"),
-        ])
-        await _migrate_table(conn, "owasp_scans", [
-            ("platform", "VARCHAR NOT NULL DEFAULT 'android'"),
-        ])
-        await _migrate_table(conn, "dynamic_sessions", [
-            ("platform", "TEXT NOT NULL DEFAULT 'android'"),
-        ])
-
-
-async def _migrate_table(conn, table: str, new_columns: list[tuple[str, str]]) -> None:
-    """Add any missing columns to a table."""
-    result = await conn.execute(__import__("sqlalchemy").text(f"PRAGMA table_info({table})"))
-    existing = {row[1] for row in result.fetchall()}
-
-    for col_name, col_def in new_columns:
-        if col_name not in existing:
-            await conn.execute(
-                __import__("sqlalchemy").text(
-                    f"ALTER TABLE {table} ADD COLUMN {col_name} {col_def}"
-                )
-            )
-
-
-# Keep old name as alias so any external callers aren't broken
-async def _migrate_analyses_columns(conn) -> None:
-    await _migrate_table(conn, "analyses", [
-        ("platform",         "VARCHAR NOT NULL DEFAULT 'android'"),
-        ("bundle_id",        "VARCHAR"),
-        ("min_ios_version",  "VARCHAR"),
-        ("ats_config_json",  "TEXT"),
-    ])
+    """Apply any pending migrations and ensure the DB is up to date."""
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(None, _run_migrations_sync)
+    logger.info("Database migrations applied")
 
 
 async def get_db() -> AsyncSession:

@@ -7,6 +7,7 @@ import { riskApi } from '@/api/risk'
 import { clsx } from 'clsx'
 import { analysisApi } from '@/api/analysis'
 import { iosApi } from '@/api/ios'
+import { cveApi } from '@/api/cve'
 import { Badge } from '@/components/common/Badge'
 import { CodeBlock } from '@/components/common/CodeBlock'
 import type { PermissionInfo, ComponentInfo, StaticFinding, SourceEntry } from '@/types/analysis'
@@ -67,6 +68,12 @@ export default function StaticAnalysis() {
     enabled: analysis?.status === 'complete' && analysis?.platform === 'ios',
   })
 
+  const { data: cveSummary } = useQuery({
+    queryKey: ['cve-summary', analysisId],
+    queryFn: () => cveApi.getSummary(analysisId),
+    enabled: analysis?.status === 'complete',
+  })
+
   const { data: sourceEntries } = useQuery({
     queryKey: ['source', analysisId, sourcePath],
     queryFn: () => analysisApi.listSource(analysisId, sourcePath),
@@ -96,10 +103,21 @@ export default function StaticAnalysis() {
               <>
                 <button
                   onClick={() => navigate(`/cve/${analysisId}`)}
-                  className="flex items-center gap-1 px-2 py-1 text-xs text-zinc-500 hover:text-orange-400 rounded hover:bg-bg-elevated transition-colors"
+                  className="flex items-center gap-1.5 px-2 py-1 text-xs text-zinc-500 hover:text-orange-400 rounded hover:bg-bg-elevated transition-colors"
                   title="CVE Correlation"
                 >
-                  <ShieldAlert size={12} /> CVE
+                  <ShieldAlert size={12} />
+                  CVE
+                  {cveSummary && cveSummary.total_critical > 0 && (
+                    <span className="px-1.5 py-0.5 rounded bg-red-600 text-white text-xs leading-none">
+                      {cveSummary.total_critical}C
+                    </span>
+                  )}
+                  {cveSummary && cveSummary.total_high > 0 && (
+                    <span className="px-1.5 py-0.5 rounded bg-orange-500 text-white text-xs leading-none">
+                      {cveSummary.total_high}H
+                    </span>
+                  )}
                 </button>
                 <button
                   onClick={() => navigate(`/webview/${analysisId}`)}

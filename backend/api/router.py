@@ -22,6 +22,9 @@ from api.ios_devices import router as ios_devices_router
 from api.ollama import router as ollama_router
 from api.strix import router as strix_router
 from api.api_testing import router as api_testing_router
+from api.objection import router as objection_router
+from api.diff import router as diff_router
+from api.campaign import router as campaign_router
 
 api_router = APIRouter()
 api_router.include_router(analysis_router, prefix="/analyses", tags=["analysis"])
@@ -46,6 +49,9 @@ api_router.include_router(ios_devices_router, prefix="/ios-devices", tags=["ios"
 api_router.include_router(ollama_router, prefix="/ollama", tags=["ollama"])
 api_router.include_router(strix_router, prefix="/strix", tags=["strix"])
 api_router.include_router(api_testing_router, prefix="/api-testing", tags=["api-testing"])
+api_router.include_router(objection_router, prefix="/objection", tags=["objection"])
+api_router.include_router(diff_router, prefix="/diff", tags=["diff"])
+api_router.include_router(campaign_router, prefix="/campaigns", tags=["campaigns"])
 
 # Singletons initialised lazily (so imports don't fail before lifespan runs)
 _proxy_manager = None

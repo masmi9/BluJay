@@ -18,7 +18,7 @@ async def capture_screenshot(body: CaptureRequest, db: AsyncSession = Depends(ge
     from core.screenshot_manager import capture_screenshot as do_capture, save_screenshot
 
     try:
-        data = await do_capture(body.serial)
+        data = await do_capture(body.serial, body.platform)
     except RuntimeError as exc:
         raise HTTPException(500, str(exc))
 

@@ -87,10 +87,10 @@ Create `backend/wordlists/jwt_secrets.txt` with ~1000 common JWT secrets (`secre
 - Filename format: `{timestamp}_{label}.png` using `%Y%m%d_%H%M%S_%f`.
 
 ### Acceptance criteria
-- [ ] Clicking "Capture Screenshot" on the Dynamic Analysis page saves a screenshot and shows it in the gallery.
-- [ ] Screenshots are persisted across page reloads (stored in DB + disk).
-- [ ] Thumbnails load without full image download.
-- [ ] PNG download works via the image endpoint.
+- [X] Clicking "Capture Screenshot" on the Dynamic Analysis page saves a screenshot and shows it in the gallery.
+- [X] Screenshots are persisted across page reloads (stored in DB + disk).
+- [X] Thumbnails load without full image download.
+- [X] PNG download works via the image endpoint.
 
 ---
 
@@ -129,10 +129,10 @@ Create `backend/wordlists/jwt_secrets.txt` with ~1000 common JWT secrets (`secre
 - Library extraction: (a) `implementation 'group:artifact:version'` in `build.gradle`, (b) known namespace clusters (`com.squareup`, `com.google`, `io.realm`, `org.apache`, `okhttp3`, etc.), (c) version strings in `res/raw/`.
 
 ### Acceptance criteria
-- [ ] Running a scan auto-triggers CVE correlation after static analysis completes.
-- [ ] CVE page shows detected libraries grouped by ecosystem.
-- [ ] Each library expands to show matched CVEs with severity, CVSS score, and OSV link.
-- [ ] Critical/High CVE count appears on the Static Analysis overview.
+- [X] Running a scan auto-triggers CVE correlation after static analysis completes.
+- [X] CVE page shows detected libraries grouped by ecosystem.
+- [X] Each library expands to show matched CVEs with severity, CVSS score, and OSV link.
+- [X] Critical/High CVE count appears on the Static Analysis overview.
 
 ---
 
@@ -167,10 +167,10 @@ Create `backend/wordlists/jwt_secrets.txt` with ~1000 common JWT secrets (`secre
 - Also scan `.html` files in `assets/` for inline `<script>` blocks.
 
 ### Acceptance criteria
-- [ ] JS files extracted from APK assets appear in the file tree.
-- [ ] Inline JavaScript from `loadUrl`/`loadData` calls is extracted and displayed.
-- [ ] Findings (secrets, eval, postMessage) are flagged with severity and line numbers.
-- [ ] `addJavascriptInterface` bridges are listed with their exposed method signatures.
+- [X] JS files extracted from APK assets appear in the file tree.
+- [X] Inline JavaScript from `loadUrl`/`loadData` calls is extracted and displayed.
+- [X] Findings (secrets, eval, postMessage) are flagged with severity and line numbers.
+- [X] `addJavascriptInterface` bridges are listed with their exposed method signatures.
 
 ---
 
@@ -577,15 +577,15 @@ Add migration for new columns on `Analysis`: `platform`, `bundle_id`, `min_ios_v
 
 Run `alembic revision --autogenerate -m "<description>"` and `alembic upgrade head` after each group of model changes:
 
-- [ ] After Feature 1: `screenshots` table
-- [ ] After Feature 2: `detected_libraries`, `cve_matches` tables
-- [ ] After Feature 4: `tls_audits` table
-- [ ] After Feature 5: `jwt_tests` table
-- [ ] After Feature 6: `analysis_diffs` table
-- [ ] After Feature 8: `fuzz_jobs`, `fuzz_results` tables
-- [ ] After Feature 9: `brute_force_jobs`, `brute_force_attempts` tables
-- [ ] After Feature 10: `platform`, `bundle_id`, `min_ios_version`, `ats_config_json` columns on `analyses`
-- [ ] After Feature 11: `campaigns`, `campaign_members` tables
+- [X] After Feature 1: `screenshots` table
+- [X] After Feature 2: `detected_libraries`, `cve_matches` tables
+- [X] After Feature 4: `tls_audits` table
+- [X] After Feature 5: `jwt_tests` table
+- [X] After Feature 6: `analysis_diffs` table
+- [X] After Feature 8: `fuzz_jobs`, `fuzz_results` tables
+- [X] After Feature 9: `brute_force_jobs`, `brute_force_attempts` tables
+- [X] After Feature 10: `platform`, `bundle_id`, `min_ios_version`, `ats_config_json` columns on `analyses`
+- [X] After Feature 11: `campaigns`, `campaign_members` tables
 
 Feature 3 (WebView), Feature 7 (Risk), and Feature 12 (MCP) require no new DB tables — they operate on existing data.
 
@@ -610,10 +610,10 @@ Via Analysis:    CVE (ShieldAlert), WebView JS (Code2), Risk (BarChart2)  ← ac
 - [x] Feature 3 — JS / WebView Analysis
 - [x] Feature 4 — TLS Audit
 - [x] Feature 5 — JWT Attack Testing
-- [ ] Feature 6 — Diff / Change Detection
+- [x] Feature 6 — Diff / Change Detection
 - [x] Feature 7 — Risk Graph & Scoring
 - [x] Feature 8 — API Fuzzing
 - [x] Feature 9 — Credential Brute Forcing
 - [x] Feature 10 — iOS / IPA Support
-- [ ] Feature 11 — Multi-APK Campaign
-- [ ] Feature 12 — MCP Server
+- [x] Feature 11 — Multi-APK Campaign
+- [x] Feature 12 — MCP Server

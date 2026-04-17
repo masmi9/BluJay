@@ -8,9 +8,10 @@ import type { Screenshot } from '@/types/screenshot'
 interface Props {
   sessionId: number
   serial: string
+  platform?: string   // 'android' | 'ios', defaults to 'android'
 }
 
-export default function ScreenshotGallery({ sessionId, serial }: Props) {
+export default function ScreenshotGallery({ sessionId, serial, platform = 'android' }: Props) {
   const qc = useQueryClient()
   const [label, setLabel] = useState('')
   const [selected, setSelected] = useState<Screenshot | null>(null)
@@ -22,7 +23,7 @@ export default function ScreenshotGallery({ sessionId, serial }: Props) {
   })
 
   const capture = useMutation({
-    mutationFn: () => screenshotApi.capture({ serial, session_id: sessionId, label }),
+    mutationFn: () => screenshotApi.capture({ serial, session_id: sessionId, label, platform }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['screenshots', sessionId] })
       setLabel('')

@@ -20,6 +20,8 @@ import BruteForcePage from '@/pages/BruteForcePage'
 import StrixPage from '@/pages/StrixPage'
 import AiTriagePage from '@/pages/AiTriagePage'
 import ApiTesting from '@/pages/ApiTesting'
+import DiffPage from '@/pages/DiffPage'
+import CampaignPage from '@/pages/CampaignPage'
 
 export default function App() {
   return (
@@ -49,6 +51,8 @@ export default function App() {
               <Route path="/strix" element={<StrixPage />} />
               <Route path="/ai-triage" element={<AiTriagePage />} />
               <Route path="/api-testing" element={<ApiTesting />} />
+              <Route path="/diff" element={<DiffPage />} />
+              <Route path="/campaigns" element={<CampaignPage />} />
               <Route path="/ipa" element={<Navigate to="/owasp" replace />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

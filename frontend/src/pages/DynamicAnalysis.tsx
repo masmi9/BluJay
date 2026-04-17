@@ -194,7 +194,7 @@ export default function DynamicAnalysis() {
         const serial = isIos ? session?.device_serial ?? null : selectedSerial
         return sessionId && serial ? (
           <div className="flex-1 bg-bg-surface rounded-lg border border-bg-border overflow-auto">
-            <ScreenshotGallery sessionId={sessionId} serial={serial} />
+            <ScreenshotGallery sessionId={sessionId} serial={serial} platform={isIos ? 'ios' : 'android'} />
           </div>
         ) : (
           <div className="flex-1 flex items-center justify-center text-zinc-500 text-sm">

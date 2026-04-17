@@ -31,22 +31,24 @@ async def list_processes(serial: str):
             mgr = frida.get_device_manager()
             device = mgr.get_device(serial, timeout=5)
 
-            # Build a map of running processes keyed by name for fast lookup
+            # Build a map of running processes keyed by both name and pid for merging.
+            running_procs: list[dict] = []
             running_by_name: dict[str, int] = {}
             try:
                 for p in device.enumerate_processes():
                     running_by_name[p.name.lower()] = p.pid
+                    running_procs.append({"pid": p.pid, "name": p.name, "identifier": None, "running": True})
             except Exception:
                 pass
 
-            # Try enumerate_applications (works on iOS + Android) to get all installed apps.
-            # scope="full" is required on Frida 15+ to populate the pid field for running apps.
+            # Try enumerate_applications to get all installed apps with bundle IDs.
+            # scope="full" (Frida 15+) populates the pid field for running apps.
+            # Fall back to no scope arg for older frida-server versions.
             apps: list[dict] = []
             try:
                 for app in device.enumerate_applications(scope="full"):
                     identifier = getattr(app, "identifier", None) or ""
                     name = app.name or identifier
-                    # pid > 0 means the app is currently running
                     pid = getattr(app, "pid", 0) or 0
                     running = pid > 0
                     apps.append({
@@ -56,14 +58,36 @@ async def list_processes(serial: str):
                         "running": running,
                     })
             except Exception:
-                pass
+                # scope="full" not supported by this frida-server version — retry without it
+                try:
+                    for app in device.enumerate_applications():
+                        identifier = getattr(app, "identifier", None) or ""
+                        name = app.name or identifier
+                        # No pid in this mode — check running_by_name to fill it in
+                        pid = running_by_name.get(name.lower(), 0)
+                        running = pid > 0
+                        apps.append({
+                            "pid": pid if running else None,
+                            "name": name,
+                            "identifier": identifier,
+                            "running": running,
+                        })
+                except Exception:
+                    pass
 
             # If enumerate_applications returned nothing, fall back to processes only
             if not apps:
-                return [
-                    {"pid": p.pid, "name": p.name, "identifier": None, "running": True}
-                    for p in sorted(device.enumerate_processes(), key=lambda p: p.name.lower())
-                ]
+                return sorted(running_procs, key=lambda a: a["name"].lower())
+
+            # Merge: add any running processes not already covered by an app entry.
+            # This catches system daemons and apps whose process name differs from
+            # their bundle ID (e.g. com.bd.nproject running as "lemon8").
+            app_identifiers = {a["identifier"].lower() for a in apps if a["identifier"]}
+            app_names = {a["name"].lower() for a in apps}
+            for proc in running_procs:
+                pname = proc["name"].lower()
+                if pname not in app_identifiers and pname not in app_names:
+                    apps.append(proc)
 
             return sorted(apps, key=lambda a: a["name"].lower())
 
