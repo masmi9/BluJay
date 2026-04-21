@@ -22,6 +22,7 @@ import AiTriagePage from '@/pages/AiTriagePage'
 import ApiTesting from '@/pages/ApiTesting'
 import DiffPage from '@/pages/DiffPage'
 import CampaignPage from '@/pages/CampaignPage'
+import ScannerPage from '@/pages/ScannerPage'
 
 export default function App() {
   return (
@@ -53,6 +54,7 @@ export default function App() {
               <Route path="/api-testing" element={<ApiTesting />} />
               <Route path="/diff" element={<DiffPage />} />
               <Route path="/campaigns" element={<CampaignPage />} />
+              <Route path="/scanner" element={<ScannerPage />} />
               <Route path="/ipa" element={<Navigate to="/owasp" replace />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

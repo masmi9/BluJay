@@ -110,6 +110,11 @@ async def launch_app(serial: str, package: str, activity: str | None = None) -> 
     return rc == 0
 
 
+async def reverse_port(serial: str, device_port: int, host_port: int) -> bool:
+    rc, _, _ = await _run("reverse", f"tcp:{device_port}", f"tcp:{host_port}", serial=serial)
+    return rc == 0
+
+
 async def set_proxy(serial: str, host: str, port: int) -> bool:
     rc, _, _ = await _run("shell", "settings", "put", "global", "http_proxy", f"{host}:{port}", serial=serial)
     return rc == 0

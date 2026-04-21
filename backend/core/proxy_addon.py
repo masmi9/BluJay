@@ -3,6 +3,7 @@ mitmproxy addon script — executed by mitmdump subprocess.
 Captures completed flows and POSTs them to the BluJay backend
 so they can be persisted and fanned-out to WebSocket subscribers.
 """
+import logging
 import os
 from datetime import datetime
 
@@ -11,6 +12,8 @@ from mitmproxy import http
 
 SESSION_ID = int(os.environ.get("BLUJAY_SESSION_ID", "0"))
 BACKEND_URL = os.environ.get("BLUJAY_BACKEND_URL", "http://127.0.0.1:8000")
+
+logger = logging.getLogger("blujay.addon")
 
 
 class BluJayCapture:
@@ -49,8 +52,8 @@ class BluJayCapture:
                     json=data,
                     timeout=5,
                 )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("BluJay addon failed to post flow: %s", e)
 
 
 addons = [BluJayCapture()]

@@ -1,10 +1,11 @@
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Search, Radio, Zap, Terminal, Shield, FlaskConical, Settings, Lock, Key, KeyRound, Radar, Brain, TestTube2, GitCompare, Layers } from 'lucide-react'
+import { LayoutDashboard, Search, Radio, Zap, Terminal, Shield, FlaskConical, Settings, Lock, Key, KeyRound, Radar, Brain, TestTube2, GitCompare, Layers, ShieldAlert } from 'lucide-react'
 import { clsx } from 'clsx'
 
 const NAV = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/proxy', icon: Radio, label: 'Proxy' },
+  { to: '/scanner', icon: ShieldAlert, label: 'Scanner' },
   { to: '/frida', icon: Zap, label: 'Frida' },
   { to: '/owasp', icon: Shield, label: 'OWASP Scanner' },
   { to: '/agent', icon: Terminal, label: 'Agent Console' },

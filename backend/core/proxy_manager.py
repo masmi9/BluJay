@@ -83,7 +83,7 @@ class ProxyManager:
                 break
             text = line.decode(errors="replace").strip()
             if text:
-                logger.debug("mitmdump", session_id=session_id, msg=text)
+                logger.warning("mitmdump", session_id=session_id, msg=text)
 
     async def _fanout(self, session_id: int, sess: _ProxySession) -> None:
         while session_id in self._sessions:

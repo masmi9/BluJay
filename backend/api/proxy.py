@@ -1,3 +1,4 @@
+import asyncio
 import io
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -85,7 +86,41 @@ async def internal_flow(data: dict, db: AsyncSession = Depends(get_db)):
     summary = {k: v for k, v in data.items() if k not in ("request_body", "response_body")}
     get_proxy_manager().push_flow(session_id, summary)
 
+    # Run passive scanner in background (non-blocking)
+    asyncio.create_task(_run_passive_scan(session_id, pf.id, data))
+
     return {"ok": True}
+
+
+async def _run_passive_scan(session_id: int, flow_id: str, flow_data: dict) -> None:
+    from core.passive_scanner import run_passive_checks
+    from models.scanner import ScanFinding
+    from urllib.parse import urlparse
+
+    try:
+        findings = run_passive_checks(flow_data)
+        if not findings:
+            return
+        from database import AsyncSessionLocal
+        async with AsyncSessionLocal() as db:
+            for f in findings:
+                sf = ScanFinding(
+                    session_id=session_id,
+                    flow_id=flow_id,
+                    scan_type="passive",
+                    check_name=f.check_name,
+                    severity=f.severity,
+                    url=flow_data.get("url", ""),
+                    host=flow_data.get("host", ""),
+                    title=f.title,
+                    detail=f.detail,
+                    evidence=f.evidence or None,
+                    remediation=f.remediation or None,
+                )
+                db.add(sf)
+            await db.commit()
+    except Exception:
+        pass
 
 
 @router.post("/start")
@@ -107,6 +142,17 @@ async def start_proxy(body: ProxyStartRequest, db: AsyncSession = Depends(get_db
     sess.proxy_port = body.port
     await db.commit()
     return {"status": "started", "port": body.port}
+
+
+@router.get("/status/{session_id}")
+async def proxy_status(session_id: int):
+    from api.router import get_proxy_manager
+    pm = get_proxy_manager()
+    sess = pm._sessions.get(session_id)
+    if not sess:
+        return {"running": False, "pid": None}
+    alive = sess.proc is not None and sess.proc.poll() is None
+    return {"running": alive, "pid": sess.proc.pid if sess.proc else None, "port": sess.port}
 
 
 @router.post("/stop/{session_id}")
@@ -198,6 +244,7 @@ class ConfigureDeviceRequest(BaseModel):
     host: str = "127.0.0.1"
     port: int = 8080
     push_cert: bool = True
+    use_reverse: bool = True
 
 
 @router.post("/configure-device")
@@ -205,12 +252,24 @@ async def configure_device(body: ConfigureDeviceRequest):
     """
     Sets the Wi-Fi proxy on the connected device via ADB and optionally pushes
     the mitmproxy CA cert to /sdcard/Download/ so the user can install it.
+    When use_reverse=True (default), sets up adb reverse so the device tunnels
+    through USB — bypasses Windows Firewall and network topology issues.
     """
     from core import adb_manager
     from api.router import get_proxy_manager
 
+    reverse_result: dict | None = None
+    proxy_host = body.host
+    if body.use_reverse:
+        ok = await adb_manager.reverse_port(body.serial, body.port, body.port)
+        if ok:
+            proxy_host = "127.0.0.1"
+            reverse_result = {"ok": True, "note": "adb reverse tunnel active — device uses 127.0.0.1"}
+        else:
+            reverse_result = {"ok": False, "note": "adb reverse failed — falling back to direct IP"}
+
     # Set proxy on device
-    proxy_ok = await adb_manager.set_proxy(body.serial, body.host, body.port)
+    proxy_ok = await adb_manager.set_proxy(body.serial, proxy_host, body.port)
     if not proxy_ok:
         raise HTTPException(500, "adb set proxy failed — is the device connected?")
 
@@ -226,8 +285,9 @@ async def configure_device(body: ConfigureDeviceRequest):
 
     return {
         "proxy_set": proxy_ok,
-        "host": body.host,
+        "host": proxy_host,
         "port": body.port,
+        "reverse": reverse_result,
         "cert": cert_result,
         "install_hint": (
             "To trust the cert: Settings → Security → Install certificate → CA certificate → "
@@ -328,9 +388,16 @@ async def get_local_ip():
     candidates = [ip for ip in candidates if not ip.startswith("127.")]
 
     # Score: prefer real Wi-Fi subnets; deprioritize known VM/virtual adapters
-    # VirtualBox host-only defaults: 192.168.56.x, 192.168.99.x
-    # VMware host-only defaults: 192.168.232.x, 192.168.133.x
-    _VM_SUBNETS = ("192.168.56.", "192.168.99.", "192.168.232.", "192.168.133.")
+    # VirtualBox host-only: 192.168.56.x, 192.168.99.x
+    # VMware host-only/NAT: 192.168.232.x, 192.168.133.x, 192.168.15.x, 192.168.182.x
+    # WSL/Hyper-V default switch: 172.16–31.x are caught by 172. score below,
+    #   but 172.21.x and 172.31.x are Hyper-V internal — deprioritize explicitly
+    _VM_SUBNETS = (
+        "192.168.56.", "192.168.99.",           # VirtualBox
+        "192.168.232.", "192.168.133.",          # VMware standard
+        "192.168.15.", "192.168.182.",           # VMware NAT/host-only (user-defined)
+        "172.21.", "172.31.",                    # Hyper-V internal/WSL
+    )
 
     def _score(ip: str) -> int:
         if any(ip.startswith(s) for s in _VM_SUBNETS):

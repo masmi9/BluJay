@@ -41,13 +41,26 @@ function stripAnsi(str: string): string {
   return str.replace(/\x1b\[[0-9;]*[mGKHF]/g, '')
 }
 
+const IP_HISTORY_KEY = 'objection_ip_history'
+
+function loadIpHistory(): string[] {
+  try { return JSON.parse(localStorage.getItem(IP_HISTORY_KEY) ?? '[]') } catch { return [] }
+}
+
+function saveIpHistory(ip: string) {
+  const prev = loadIpHistory().filter((h) => h !== ip)
+  localStorage.setItem(IP_HISTORY_KEY, JSON.stringify([ip, ...prev].slice(0, 10)))
+}
+
 // ─── Objection Panel ────────────────────────────────────────────────────────
 
 function ObjectionPanel({ serial }: { serial: string }) {
+  const { data: iosDevices = [] } = useQuery({ queryKey: ['ios-devices'], queryFn: iosApi.listDevices, refetchInterval: 10000 })
+
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [gadget, setGadget] = useState('')
-  // Serial is optional — leave blank to let frida auto-detect the USB device
-  const [deviceSerial, setDeviceSerial] = useState('')
+  const [host, setHost] = useState('')
+  const [ipHistory, setIpHistory] = useState<string[]>(loadIpHistory)
   const [lines, setLines] = useState<string[]>([])
   const [input, setInput] = useState('')
   const [history, setHistory] = useState<string[]>([])
@@ -57,6 +70,15 @@ function ObjectionPanel({ serial }: { serial: string }) {
   const outputRef = useRef<HTMLDivElement>(null)
   const wsRef = useRef<WebSocket | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  // Load apps for the selected iOS device
+  const selectedUdid = iosDevices[0]?.udid ?? ''
+  const { data: iosApps = [] } = useQuery({
+    queryKey: ['ios-apps', selectedUdid],
+    queryFn: () => iosApi.listApps(selectedUdid),
+    enabled: !!selectedUdid,
+    staleTime: 30_000,
+  })
 
   const apiBase = (window as any).__API_BASE__ ?? ''
   const wsBase = apiBase.replace(/^http/, 'ws')
@@ -83,10 +105,6 @@ function ObjectionPanel({ serial }: { serial: string }) {
       try {
         const msg = JSON.parse(e.data)
         if (msg.type === 'output' && msg.data) appendLine(msg.data)
-        if (msg.type === 'exit' && msg.data) {
-          appendLine(msg.data)
-          setSessionId(null)
-        }
       } catch {}
     }
     ws.onerror = () => appendLine('\n[WebSocket error — connection lost]\n')
@@ -104,9 +122,18 @@ function ObjectionPanel({ serial }: { serial: string }) {
     setError(null)
     setLines([])
     try {
-      const sess = await objectionApi.start(gadget.trim(), deviceSerial.trim() || undefined)
+      const sess = await objectionApi.start(
+        gadget.trim(),
+        undefined,
+        host.trim() || undefined,
+      )
+      if (host.trim()) {
+        saveIpHistory(host.trim())
+        setIpHistory(loadIpHistory())
+      }
       setSessionId(sess.session_id)
-      appendLine(`[objection] starting session for ${gadget}${deviceSerial.trim() ? ` on device ${deviceSerial.trim()}` : ' (auto-detect device)'}\n`)
+      const connDesc = host.trim() ? ` via ${host.trim()}` : ' (auto-detect device)'
+      appendLine(`[objection] starting session for ${gadget}${connDesc}\n`)
     } catch (e: any) {
       setError(e?.response?.data?.detail ?? e?.message ?? 'Failed to start objection')
     } finally {
@@ -161,21 +188,44 @@ function ObjectionPanel({ serial }: { serial: string }) {
         <div className="flex-1" />
         {!sessionId ? (
           <>
-            <input
-              className="bg-bg-elevated border border-bg-border rounded px-2 py-1.5 text-xs text-zinc-200 w-56 placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
-              placeholder="Bundle ID / package name"
-              value={gadget}
-              onChange={(e) => setGadget(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') startSession() }}
-            />
-            <input
-              className="bg-bg-elevated border border-bg-border rounded px-2 py-1.5 text-xs text-zinc-200 w-40 placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
-              placeholder="Device serial (optional)"
-              value={deviceSerial}
-              onChange={(e) => setDeviceSerial(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') startSession() }}
-              title="Leave blank to auto-detect USB device"
-            />
+            {/* Bundle ID — dropdown from installed apps, or free-type */}
+            {iosApps.length > 0 ? (
+              <select
+                className="bg-bg-elevated border border-bg-border rounded px-2 py-1.5 text-xs text-zinc-200 w-52 focus:outline-none focus:border-zinc-500"
+                value={gadget}
+                onChange={(e) => setGadget(e.target.value)}
+              >
+                <option value="">Select app…</option>
+                {iosApps.map((a) => (
+                  <option key={a.bundle_id} value={a.bundle_id}>
+                    {a.name ? `${a.name} (${a.bundle_id})` : a.bundle_id}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                className="bg-bg-elevated border border-bg-border rounded px-2 py-1.5 text-xs text-zinc-200 w-52 placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
+                placeholder="Bundle ID / package name"
+                value={gadget}
+                onChange={(e) => setGadget(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') startSession() }}
+              />
+            )}
+            {/* Host IP — dropdown of previously used IPs */}
+            <div className="relative">
+              <input
+                list="objection-ip-history"
+                className="bg-bg-elevated border border-bg-border rounded px-2 py-1.5 text-xs text-zinc-200 w-36 placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
+                placeholder="Host IP (optional)"
+                value={host}
+                onChange={(e) => setHost(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') startSession() }}
+                title="Device IP for network mode — use when USB frida fails (e.g. 10.0.0.174)"
+              />
+              <datalist id="objection-ip-history">
+                {ipHistory.map((ip) => <option key={ip} value={ip} />)}
+              </datalist>
+            </div>
             <button
               onClick={startSession}
               disabled={!gadget.trim() || starting}

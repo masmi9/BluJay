@@ -210,6 +210,34 @@ async def ws_objection(ws: WebSocket, session_id: str):
         mgr.unsubscribe(session_id, queue)
 
 
+# --- Active scanner ---
+
+_scanner_subscribers: dict[int, list[asyncio.Queue]] = {}
+
+
+async def broadcast_scanner(job_id: int, msg: dict) -> None:
+    for q in list(_scanner_subscribers.get(job_id, [])):
+        try:
+            q.put_nowait(msg)
+        except asyncio.QueueFull:
+            pass
+
+
+@ws_router.websocket("/scanner/{job_id}")
+async def ws_scanner(ws: WebSocket, job_id: int):
+    await ws.accept()
+    q: asyncio.Queue = asyncio.Queue(maxsize=500)
+    _scanner_subscribers.setdefault(job_id, []).append(q)
+    try:
+        await _ws_send_loop(ws, q)
+    finally:
+        subs = _scanner_subscribers.get(job_id, [])
+        try:
+            subs.remove(q)
+        except ValueError:
+            pass
+
+
 # --- OWASP scan progress ---
 
 @ws_router.websocket("/owasp/{scan_id}")

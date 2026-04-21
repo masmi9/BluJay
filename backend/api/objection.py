@@ -15,8 +15,10 @@ def get_objection_manager():
 
 
 class StartRequest(BaseModel):
-    gadget: str           # bundle ID (iOS) or package name (Android)
+    gadget: str                        # bundle ID (iOS) or package name (Android)
     device_serial: str | None = None   # Frida device ID / ADB serial
+    host: str | None = None            # IP for network mode (-N -h); bypasses USB driver issues on Windows
+    spawn: bool = False                # spawn + immediately resume the target app (-s -p)
 
 
 class CommandRequest(BaseModel):
@@ -39,7 +41,7 @@ async def start_session(body: StartRequest):
         ))
 
     try:
-        session_id = await mgr.start(body.gadget, body.device_serial)
+        session_id = await mgr.start(body.gadget, body.device_serial, body.host, body.spawn)
     except Exception as e:
         raise HTTPException(500, f"{type(e).__name__}: {e}\n{traceback.format_exc()}")
     return {"session_id": session_id, "gadget": body.gadget}

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Virtuoso } from 'react-virtuoso'
-import { Play, Square, Trash2, Download, RefreshCw, Smartphone, X, Plus, Send, ChevronDown, Clipboard, Check, Apple, Radio } from 'lucide-react'
+import { Play, Square, Trash2, Download, RefreshCw, Smartphone, X, Plus, Send, ChevronDown, Clipboard, Check, Apple, Radio, Filter } from 'lucide-react'
 import { clsx } from 'clsx'
 import { proxyApi } from '@/api/proxy'
 import { iosApi } from '@/api/ios'
@@ -43,9 +43,21 @@ export default function ProxyPage() {
   const statusTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const [iosSetupOpen, setIosSetupOpen] = useState(false)
+  const [selectedAndroidIp, setSelectedAndroidIp] = useState<string | null>(null)
 
   const connectedSerial = devices.find((d) => d.state === 'device')?.serial ?? null
-  const proxyPort = activeSession?.proxy_port ?? 8080
+  const [customPort, setCustomPort] = useState(8080)
+  const proxyPort = activeSession?.proxy_port ?? customPort
+
+  const { data: settingsData } = useQuery({
+    queryKey: ['settings'],
+    queryFn: () => import('axios').then((ax) => ax.default.get('/api/v1/settings').then((r) => r.data)),
+    staleTime: 60_000,
+  })
+
+  useEffect(() => {
+    if (settingsData?.proxy_port) setCustomPort(settingsData.proxy_port)
+  }, [settingsData?.proxy_port])
   const effectiveSessionId = sessionId ?? 0
 
   const { data: iosDevices = [] } = useQuery<IosDeviceInfo[]>({
@@ -61,6 +73,29 @@ export default function ProxyPage() {
   })
   const localIp = localIpData?.local_ip ?? '…'
   const allIps = localIpData?.all_ips ?? []
+
+  const androidIp = selectedAndroidIp ?? localIp
+
+  const [blockedHosts, setBlockedHosts] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem('proxy-blocked-hosts') || '[]') } catch { return [] }
+  })
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [filterInput, setFilterInput] = useState('')
+
+  const addBlockedHost = (host: string) => {
+    const h = host.trim()
+    if (!h || blockedHosts.includes(h)) return
+    const next = [...blockedHosts, h]
+    setBlockedHosts(next)
+    localStorage.setItem('proxy-blocked-hosts', JSON.stringify(next))
+    setFilterInput('')
+  }
+
+  const removeBlockedHost = (host: string) => {
+    const next = blockedHosts.filter((h) => h !== host)
+    setBlockedHosts(next)
+    localStorage.setItem('proxy-blocked-hosts', JSON.stringify(next))
+  }
 
   useProxyFlows(running ? effectiveSessionId : null)
 
@@ -99,11 +134,11 @@ export default function ProxyPage() {
     if (!running) { showStatus(false, 'Start the proxy first so the CA cert is generated, then configure the device.'); return }
     setConfiguring(true)
     try {
-      const result = await proxyApi.configureDevice(connectedSerial, '127.0.0.1', proxyPort)
+      const result = await proxyApi.configureDevice(connectedSerial, androidIp, proxyPort)
       if (result.cert?.pushed) {
-        showStatus(true, `Proxy set to 127.0.0.1:${proxyPort}. Cert pushed to ${result.cert.remote_path} — install via Settings → Security → Install certificate → CA certificate.`)
+        showStatus(true, `Proxy set to ${androidIp}:${proxyPort}. Cert pushed to ${result.cert.remote_path} — install via Settings → Security → Install certificate → CA certificate.`)
       } else {
-        showStatus(true, `Proxy set to 127.0.0.1:${proxyPort}.`)
+        showStatus(true, `Proxy set to ${androidIp}:${proxyPort}.`)
       }
     } catch (e: any) {
       showStatus(false, e?.response?.data?.detail ?? 'Failed to configure device proxy')
@@ -200,6 +235,17 @@ export default function ProxyPage() {
           {running ? <><Square size={12} /> Stop</> : <><Play size={12} /> Start</>}
         </button>
 
+        {!running && (
+          <input
+            type="number"
+            min={1024} max={65535}
+            value={customPort}
+            onChange={(e) => setCustomPort(Number(e.target.value))}
+            className="w-20 bg-bg-elevated border border-bg-border rounded px-2 py-1 text-xs font-mono text-zinc-300 focus:outline-none focus:border-accent"
+            title="Proxy port"
+          />
+        )}
+
         {running && (
           <span className="text-xs text-green-400 flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
@@ -209,8 +255,20 @@ export default function ProxyPage() {
 
         {connectedSerial && (
           <>
+            {allIps.length > 1 && (
+              <select
+                value={selectedAndroidIp ?? localIp}
+                onChange={(e) => setSelectedAndroidIp(e.target.value)}
+                className="bg-bg-elevated border border-bg-border rounded px-2 py-1 text-xs font-mono text-zinc-300 focus:outline-none focus:border-accent"
+                title="Select the network interface your Android device can reach"
+              >
+                {allIps.map((ip) => (
+                  <option key={ip} value={ip}>{ip}</option>
+                ))}
+              </select>
+            )}
             <button onClick={configureDevice} disabled={configuring}
-              title={running ? `Set proxy 127.0.0.1:${proxyPort} on device and push CA cert` : 'Start the proxy first'}
+              title={running ? `Set proxy ${androidIp}:${proxyPort} on device and push CA cert` : 'Start the proxy first'}
               className={clsx('flex items-center gap-1 px-2 py-1 text-xs rounded hover:bg-bg-elevated disabled:opacity-40 transition-colors',
                 running ? 'text-zinc-400 hover:text-zinc-200' : 'text-zinc-600 cursor-not-allowed')}>
               <Smartphone size={12} />
@@ -243,6 +301,18 @@ export default function ProxyPage() {
           </span>
         )}
 
+        <button
+          onClick={() => setFilterOpen((v) => !v)}
+          className={clsx('flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors',
+            filterOpen || blockedHosts.length > 0
+              ? 'text-amber-400 bg-amber-500/10 hover:bg-amber-500/20'
+              : 'text-zinc-500 hover:text-zinc-200 hover:bg-bg-elevated')}
+          title="Filter hosts"
+        >
+          <Filter size={12} />
+          {blockedHosts.length > 0 && <span>{blockedHosts.length}</span>}
+        </button>
+
         <span className="text-xs text-zinc-500">{flows.length} requests</span>
 
         <a href="/api/v1/proxy/cert" download="mitmproxy-ca-cert.pem"
@@ -253,6 +323,34 @@ export default function ProxyPage() {
           <Trash2 size={14} />
         </button>
       </div>
+
+      {/* Host filter panel */}
+      {filterOpen && (
+        <div className="border-b border-bg-border bg-bg-surface px-4 py-2 shrink-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-zinc-500 shrink-0">Hidden hosts:</span>
+            {blockedHosts.map((h) => (
+              <span key={h} className="flex items-center gap-1 px-2 py-0.5 bg-amber-500/10 border border-amber-500/20 rounded text-xs font-mono text-amber-300">
+                {h}
+                <button onClick={() => removeBlockedHost(h)} className="text-amber-500 hover:text-amber-200 transition-colors">
+                  <X size={10} />
+                </button>
+              </span>
+            ))}
+            <form onSubmit={(e) => { e.preventDefault(); addBlockedHost(filterInput) }} className="flex items-center gap-1">
+              <input
+                className="bg-bg-elevated border border-bg-border rounded px-2 py-0.5 text-xs font-mono text-zinc-300 placeholder-zinc-600 focus:outline-none focus:border-amber-500/50 w-48"
+                placeholder="fonts.gstatic.com"
+                value={filterInput}
+                onChange={(e) => setFilterInput(e.target.value)}
+              />
+              <button type="submit" className="px-2 py-0.5 text-xs bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 rounded transition-colors">
+                Hide
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* iOS Setup guide */}
       {iosSetupOpen && (
@@ -283,7 +381,11 @@ export default function ProxyPage() {
           direction="vertical"
           defaultSplit={45}
           className="flex-1"
-          left={<FlowTable flows={flows} selectedId={selectedFlowId} onSelect={selectFlow} />}
+          left={<FlowTable
+            flows={blockedHosts.length > 0 ? flows.filter((f) => !blockedHosts.some((b) => f.host?.includes(b))) : flows}
+            selectedId={selectedFlowId}
+            onSelect={selectFlow}
+          />}
           right={
             <FlowDetailPanel
               flow={flowDetail ?? null}
@@ -615,19 +717,29 @@ function FlowDetailPanel({ flow, onSendToRepeater }: {
 
   if (!flow) return <div className="flex items-center justify-center h-full text-zinc-600 text-sm">Select a request</div>
 
-  const headers = view === 'request'
-    ? JSON.parse(flow.request_headers || '{}')
-    : JSON.parse(flow.response_headers || '{}')
+  const reqHeaders: Record<string, string> = (() => { try { return JSON.parse(flow.request_headers || '{}') } catch { return {} } })()
+  const respHeaders: Record<string, string> = (() => { try { return JSON.parse(flow.response_headers || '{}') } catch { return {} } })()
+  const headers = view === 'request' ? reqHeaders : respHeaders
 
   const body = view === 'request' ? flow.request_body : flow.response_body
-  const isJson = (flow.content_type || '').includes('json')
+
+  // Detect content type from the relevant headers, then auto-detect JSON by trying to parse
+  const contentType = view === 'request'
+    ? (Object.entries(reqHeaders).find(([k]) => k.toLowerCase() === 'content-type')?.[1] ?? '')
+    : ((flow.content_type || Object.entries(respHeaders).find(([k]) => k.toLowerCase() === 'content-type')?.[1]) ?? '')
 
   let bodyDisplay = ''
+  let isJson = false
   if (body) {
     try {
       bodyDisplay = typeof body === 'string' ? body : new TextDecoder().decode(body as unknown as Uint8Array)
-      if (isJson) bodyDisplay = JSON.stringify(JSON.parse(bodyDisplay), null, 2)
-    } catch { bodyDisplay = String(body) }
+      // Try JSON formatting: first check content-type, then auto-detect
+      if (contentType.includes('json') || bodyDisplay.trimStart().startsWith('{') || bodyDisplay.trimStart().startsWith('[')) {
+        const parsed = JSON.parse(bodyDisplay)
+        bodyDisplay = JSON.stringify(parsed, null, 2)
+        isJson = true
+      }
+    } catch { bodyDisplay = typeof body === 'string' ? body : String(body) }
   }
 
   return (

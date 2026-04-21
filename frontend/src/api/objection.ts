@@ -7,9 +7,13 @@ export interface ObjectionSession {
 }
 
 export const objectionApi = {
-  start: (gadget: string, deviceSerial?: string) =>
-    api.post<ObjectionSession>('/objection/sessions', { gadget, device_serial: deviceSerial ?? null })
-      .then((r) => r.data),
+  start: (gadget: string, deviceSerial?: string, host?: string, spawn?: boolean) =>
+    api.post<ObjectionSession>('/objection/sessions', {
+      gadget,
+      device_serial: deviceSerial ?? null,
+      host: host || null,
+      spawn: spawn ?? false,
+    }).then((r) => r.data),
 
   stop: (sessionId: string) =>
     api.delete(`/objection/sessions/${sessionId}`).then((r) => r.data),

@@ -145,8 +145,11 @@ python -m venv venv
 venv\Scripts\activate          # Windows
 # or: source venv/bin/activate  # Linux/macOS/WSL
 pip install -r requirements.txt
-python main.py --reload
+python run.py          # development (hot-reload on by default)
+python run.py --no-reload  # stable — use this when running the proxy
 ```
+
+> **Note:** Use `--no-reload` when using the proxy. Hot-reload wipes the `ProxyManager` state and orphans any running `mitmdump` process, which prevents new proxy sessions from starting until the orphan is killed.
 
 ### Frontend
 
@@ -206,6 +209,65 @@ cd METATRON
 ollama create metatron-qwen -f Modelfile
 ollama run metatron-qwen
 ```
+
+## Proxy Setup
+
+### Verifying the proxy is running
+
+After clicking **Start** on the Proxy page, confirm the `mitmdump` process launched successfully:
+
+```
+GET http://localhost:8000/api/v1/proxy/status/0
+```
+
+Expected response when running correctly:
+```json
+{ "running": true, "pid": 12345, "port": 8080 }
+```
+
+If you get `{ "running": false, "pid": null }`:
+
+| Cause | Fix |
+|-------|-----|
+| **Proxy was never started** | Click **Start** on the Proxy page first |
+| **Hot-reload wiped the session** | Restart with `python run.py --no-reload`, then click Start |
+| **Orphaned `mitmdump` holding port 8080** | Run `taskkill /F /IM mitmdump.exe`, then restart the backend and click Start |
+| **`mitmdump` not found** | Ensure `mitmproxy` is installed in the same venv as the backend: `pip install mitmproxy` |
+
+### Android traffic capture
+
+The proxy uses `adb reverse` to tunnel traffic through the USB connection — this bypasses Windows Firewall and avoids network topology issues entirely.
+
+1. Start the backend with `--no-reload`
+2. Click **Start** on the Proxy page — verify status returns `running: true`
+3. Click **Configure Device** — this automatically runs `adb reverse tcp:8080 tcp:8080` and sets the device proxy to `127.0.0.1:8080`
+4. Install the CA cert on the device:
+   - The cert is pushed to `/sdcard/Download/mitmproxy-ca-cert.pem` automatically
+   - **Android 11+:** Settings → Security → Encryption & credentials → Install a certificate → CA certificate → select the `.pem` from Downloads
+   - Confirm it appears under Settings → Security → Trusted credentials → User tab
+5. Test with `http://neverssl.com` in the device browser — the request should appear in the flow table immediately
+
+> **HTTPS in modern apps (Android 7+):** Apps targeting API 24+ reject user-installed CA certs by default due to Network Security Config. Use the **Frida** page to attach to the target app and load the **SSL Pinning Bypass** script to force the app to trust the mitmproxy cert.
+
+To manually set up the ADB reverse tunnel without clicking Configure Device:
+```bash
+adb reverse tcp:8080 tcp:8080
+adb shell settings put global http_proxy 127.0.0.1:8080
+
+# To clear when done:
+adb shell settings put global http_proxy :0
+adb reverse --remove tcp:8080
+```
+
+### iOS traffic capture
+
+1. Connect iPhone via USB
+2. Start the proxy, then click **iOS Setup** in the toolbar (visible when an iOS device is detected)
+3. Start the cert server → scan the QR code with the iPhone camera
+4. Install the cert: Settings → General → VPN & Device Management → install
+5. Enable full trust: Settings → General → About → Certificate Trust Settings → toggle mitmproxy on
+6. Set the Wi-Fi proxy manually on the iPhone: Settings → Wi-Fi → [network] → Configure Proxy → Manual → enter your PC's LAN IP and port 8080
+7. For apps with SSL pinning: attach Frida and load the **iOS SSL Pinning Bypass** script
 
 ## Configuration
 
