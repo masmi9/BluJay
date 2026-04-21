@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Virtuoso } from 'react-virtuoso'
-import { Play, Square, Trash2, Download, RefreshCw, Smartphone, X, Plus, Send, ChevronDown, Clipboard, Check, Apple, Radio, Filter } from 'lucide-react'
+import { Play, Square, Trash2, Download, RefreshCw, Smartphone, X, Plus, Send, ChevronDown, Clipboard, Check, Apple, Radio, Filter, ShieldAlert } from 'lucide-react'
 import { clsx } from 'clsx'
 import { proxyApi } from '@/api/proxy'
+import { addScannerUrl } from '@/pages/ScannerPage'
 import { iosApi } from '@/api/ios'
 import { Badge } from '@/components/common/Badge'
 import { SplitPane } from '@/components/common/SplitPane'
@@ -276,7 +277,7 @@ export default function ProxyPage() {
             </button>
             <button onClick={unconfigureDevice}
               className="flex items-center gap-1 px-2 py-1 text-xs text-zinc-500 hover:text-zinc-300 rounded hover:bg-bg-elevated">
-              <X size={12} /> Clear Proxy
+              <Smartphone size={12} /> Remove Device
             </button>
           </>
         )}
@@ -319,7 +320,15 @@ export default function ProxyPage() {
           className="flex items-center gap-1 px-2 py-1 text-xs text-zinc-400 hover:text-zinc-200 rounded hover:bg-bg-elevated">
           <Download size={12} /> CA Cert
         </a>
-        <button onClick={clearFlows} className="p-1.5 text-zinc-500 hover:text-zinc-200 rounded hover:bg-bg-elevated">
+        <button
+          onClick={async () => {
+            try { await proxyApi.clearFlows(effectiveSessionId) } catch { /* ignore */ }
+            clearFlows()
+          }}
+          title="Clear all captured traffic"
+          aria-label="Clear all captured traffic"
+          className="p-1.5 text-zinc-500 hover:text-zinc-200 rounded hover:bg-bg-elevated"
+        >
           <Trash2 size={14} />
         </button>
       </div>
@@ -332,7 +341,7 @@ export default function ProxyPage() {
             {blockedHosts.map((h) => (
               <span key={h} className="flex items-center gap-1 px-2 py-0.5 bg-amber-500/10 border border-amber-500/20 rounded text-xs font-mono text-amber-300">
                 {h}
-                <button onClick={() => removeBlockedHost(h)} className="text-amber-500 hover:text-amber-200 transition-colors">
+                <button onClick={() => removeBlockedHost(h)} title={`Remove ${h}`} aria-label={`Remove ${h}`} className="text-amber-500 hover:text-amber-200 transition-colors">
                   <X size={10} />
                 </button>
               </span>
@@ -407,12 +416,13 @@ export default function ProxyPage() {
                 onClick={() => setActiveRepeaterId(tab.id)}>
                 <span className="max-w-[140px] truncate">{tab.label}</span>
                 <button onClick={(e) => { e.stopPropagation(); closeRepeaterTab(tab.id) }}
+                  title="Close tab" aria-label="Close tab"
                   className="opacity-0 group-hover:opacity-100 text-zinc-600 hover:text-zinc-300 transition-opacity">
                   <X size={10} />
                 </button>
               </div>
             ))}
-            <button onClick={addRepeaterTab}
+            <button onClick={addRepeaterTab} title="New tab" aria-label="New tab"
               className="px-3 py-2 text-zinc-600 hover:text-zinc-300 shrink-0 transition-colors">
               <Plus size={13} />
             </button>
@@ -515,7 +525,7 @@ function IosSetupPanel({ iosDevices, localIp, allIps, proxyPort, proxyRunning, o
               </span>
             ))}
           </div>
-          <button onClick={onClose} className="text-zinc-600 hover:text-zinc-300 transition-colors">
+          <button onClick={onClose} title="Close iOS setup" aria-label="Close iOS setup" className="text-zinc-600 hover:text-zinc-300 transition-colors">
             <X size={13} />
           </button>
         </div>
@@ -541,6 +551,8 @@ function IosSetupPanel({ iosDevices, localIp, allIps, proxyPort, proxyRunning, o
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-zinc-600 shrink-0">Interface</span>
                     <select
+                      aria-label="Network interface"
+                      title="Network interface"
                       className="flex-1 bg-bg-elevated border border-bg-border rounded px-2 py-1 text-xs font-mono text-zinc-300 focus:outline-none focus:border-accent"
                       value={selectedIp}
                       onChange={(e) => setSelectedIp(e.target.value)}
@@ -554,6 +566,9 @@ function IosSetupPanel({ iosDevices, localIp, allIps, proxyPort, proxyRunning, o
                 <div className="flex items-center gap-2">
                   <input
                     type="number"
+                    title="Cert server port"
+                    aria-label="Cert server port"
+                    placeholder="8888"
                     className="w-20 bg-bg-elevated border border-bg-border rounded px-2 py-1 text-xs font-mono text-zinc-300 focus:outline-none focus:border-accent"
                     value={certServerPort}
                     onChange={(e) => setCertServerPort(Number(e.target.value))}
@@ -573,7 +588,7 @@ function IosSetupPanel({ iosDevices, localIp, allIps, proxyPort, proxyRunning, o
                 <div className="flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse shrink-0" />
                   <span className="text-xs text-green-400">Cert server running</span>
-                  <button onClick={stopCertServer} className="ml-auto text-zinc-600 hover:text-red-400 transition-colors">
+                  <button onClick={stopCertServer} title="Stop cert server" aria-label="Stop cert server" className="ml-auto text-zinc-600 hover:text-red-400 transition-colors">
                     <X size={11} />
                   </button>
                 </div>
@@ -709,43 +724,79 @@ function FlowTable({ flows, selectedId, onSelect }: {
 
 // ─── Flow detail panel ────────────────────────────────────────────────────────
 
+function parseBody(raw: string | null | undefined, headers: Record<string, string>, fallbackContentType?: string) {
+  if (!raw) return { display: '', isJson: false }
+  let display = typeof raw === 'string' ? raw : String(raw)
+  const ct = Object.entries(headers).find(([k]) => k.toLowerCase() === 'content-type')?.[1]
+    ?? fallbackContentType ?? ''
+  try {
+    if (ct.includes('json') || display.trimStart().startsWith('{') || display.trimStart().startsWith('[')) {
+      display = JSON.stringify(JSON.parse(display), null, 2)
+      return { display, isJson: true }
+    }
+  } catch { /* leave as-is */ }
+  return { display, isJson: false }
+}
+
+function FlowPane({ title, headers, body, isJson, statusLine }: {
+  title: string
+  headers: Record<string, string>
+  body: string
+  isJson: boolean
+  statusLine?: string
+}) {
+  return (
+    <div className="flex flex-col h-full min-w-0">
+      <div className="px-3 py-1.5 border-b border-bg-border bg-bg-surface shrink-0 flex items-center gap-2">
+        <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wide">{title}</span>
+        {statusLine && <span className="text-xs font-mono text-zinc-500 ml-auto">{statusLine}</span>}
+      </div>
+      <div className="flex flex-col flex-1 overflow-hidden">
+        {/* Headers */}
+        <div className="overflow-y-auto border-b border-bg-border p-3 space-y-0.5" style={{ maxHeight: '40%' }}>
+          {Object.entries(headers).map(([k, v]) => (
+            <div key={k} className="flex gap-2 text-xs font-mono leading-relaxed">
+              <span className="text-zinc-500 shrink-0">{k}:</span>
+              <span className="text-zinc-300 break-all">{String(v)}</span>
+            </div>
+          ))}
+        </div>
+        {/* Body */}
+        <div className="flex-1 overflow-hidden">
+          {body ? (
+            <CodeBlock code={body} language={isJson ? 'json' : 'markup'} className="h-full rounded-none" />
+          ) : (
+            <div className="p-4 text-zinc-600 text-xs">No body</div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function FlowDetailPanel({ flow, onSendToRepeater }: {
   flow: ProxyFlowDetail | null
   onSendToRepeater?: () => void
 }) {
-  const [view, setView] = useState<'request' | 'response'>('request')
-
   if (!flow) return <div className="flex items-center justify-center h-full text-zinc-600 text-sm">Select a request</div>
 
   const reqHeaders: Record<string, string> = (() => { try { return JSON.parse(flow.request_headers || '{}') } catch { return {} } })()
   const respHeaders: Record<string, string> = (() => { try { return JSON.parse(flow.response_headers || '{}') } catch { return {} } })()
-  const headers = view === 'request' ? reqHeaders : respHeaders
 
-  const body = view === 'request' ? flow.request_body : flow.response_body
-
-  // Detect content type from the relevant headers, then auto-detect JSON by trying to parse
-  const contentType = view === 'request'
-    ? (Object.entries(reqHeaders).find(([k]) => k.toLowerCase() === 'content-type')?.[1] ?? '')
-    : ((flow.content_type || Object.entries(respHeaders).find(([k]) => k.toLowerCase() === 'content-type')?.[1]) ?? '')
-
-  let bodyDisplay = ''
-  let isJson = false
-  if (body) {
-    try {
-      bodyDisplay = typeof body === 'string' ? body : new TextDecoder().decode(body as unknown as Uint8Array)
-      // Try JSON formatting: first check content-type, then auto-detect
-      if (contentType.includes('json') || bodyDisplay.trimStart().startsWith('{') || bodyDisplay.trimStart().startsWith('[')) {
-        const parsed = JSON.parse(bodyDisplay)
-        bodyDisplay = JSON.stringify(parsed, null, 2)
-        isJson = true
-      }
-    } catch { bodyDisplay = typeof body === 'string' ? body : String(body) }
-  }
+  const req = parseBody(flow.request_body, reqHeaders)
+  const resp = parseBody(flow.response_body, respHeaders, flow.content_type ?? undefined)
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center gap-2 px-4 py-2 border-b border-bg-border bg-bg-surface shrink-0">
+      {/* URL bar */}
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-bg-border bg-bg-surface shrink-0">
         <span className="text-xs font-mono text-zinc-400 flex-1 truncate">{flow.url}</span>
+        <button
+          onClick={() => addScannerUrl(flow.url)}
+          className="flex items-center gap-1 px-2 py-1 text-xs bg-purple-500/20 text-purple-400 hover:bg-purple-500/30 rounded transition-colors"
+          title="Add this URL to the Scanner target list">
+          <ShieldAlert size={11} /> Send to Scanner
+        </button>
         {onSendToRepeater && (
           <button onClick={onSendToRepeater}
             className="flex items-center gap-1 px-2 py-1 text-xs bg-accent/20 text-accent hover:bg-accent/30 rounded transition-colors"
@@ -753,38 +804,27 @@ function FlowDetailPanel({ flow, onSendToRepeater }: {
             <Send size={11} /> Send to Repeater
           </button>
         )}
-        <button onClick={() => setView('request')}
-          className={clsx('text-xs px-2 py-1 rounded', view === 'request' ? 'bg-accent text-white' : 'text-zinc-500 hover:text-zinc-200')}>
-          Request
-        </button>
-        <button onClick={() => setView('response')}
-          className={clsx('text-xs px-2 py-1 rounded', view === 'response' ? 'bg-accent text-white' : 'text-zinc-500 hover:text-zinc-200')}>
-          Response
-        </button>
       </div>
-      <div className="flex-1 overflow-auto">
-        <SplitPane direction="horizontal" defaultSplit={40} className="h-full"
-          left={
-            <div className="p-3 space-y-1">
-              <p className="text-xs text-zinc-600 mb-2 uppercase tracking-wide">Headers</p>
-              {Object.entries(headers).map(([k, v]) => (
-                <div key={k} className="flex gap-2 text-xs font-mono">
-                  <span className="text-zinc-500 shrink-0">{k}:</span>
-                  <span className="text-zinc-300 break-all">{String(v)}</span>
-                </div>
-              ))}
-            </div>
-          }
-          right={
-            <div className="h-full">
-              {bodyDisplay ? (
-                <CodeBlock code={bodyDisplay} language={isJson ? 'json' : 'markup'} className="h-full rounded-none" />
-              ) : (
-                <div className="p-4 text-zinc-600 text-xs">No body</div>
-              )}
-            </div>
-          }
-        />
+      {/* Side-by-side request / response */}
+      <div className="flex flex-1 overflow-hidden divide-x divide-bg-border">
+        <div className="flex-1 overflow-hidden">
+          <FlowPane
+            title="Request"
+            headers={reqHeaders}
+            body={req.display}
+            isJson={req.isJson}
+            statusLine={`${flow.method}`}
+          />
+        </div>
+        <div className="flex-1 overflow-hidden">
+          <FlowPane
+            title="Response"
+            headers={respHeaders}
+            body={resp.display}
+            isJson={resp.isJson}
+            statusLine={flow.response_status ? `${flow.response_status}${flow.duration_ms ? ` · ${flow.duration_ms.toFixed(0)}ms` : ''}` : undefined}
+          />
+        </div>
       </div>
     </div>
   )
@@ -825,6 +865,8 @@ function RepeaterPanel({ tab, onChange, onSend }: {
           <select
             value={tab.method}
             onChange={(e) => onChange({ method: e.target.value })}
+            aria-label="HTTP method"
+            title="HTTP method"
             className="appearance-none bg-bg-elevated border border-bg-border rounded px-2 py-1.5 text-xs font-mono text-zinc-200 pr-6 focus:outline-none focus:border-accent"
           >
             {METHODS.map((m) => <option key={m}>{m}</option>)}
@@ -857,7 +899,7 @@ function RepeaterPanel({ tab, onChange, onSend }: {
           <div className="flex flex-col h-full overflow-hidden">
             <div className="flex items-center justify-between px-3 py-1.5 border-b border-bg-border shrink-0">
               <span className="text-xs text-zinc-600 uppercase tracking-wide">Headers</span>
-              <button onClick={addHeader} className="text-zinc-600 hover:text-zinc-300 transition-colors">
+              <button onClick={addHeader} title="Add header" aria-label="Add header" className="text-zinc-600 hover:text-zinc-300 transition-colors">
                 <Plus size={12} />
               </button>
             </div>
@@ -877,7 +919,7 @@ function RepeaterPanel({ tab, onChange, onSend }: {
                     value={h.value}
                     onChange={(e) => updateHeader(i, 'value', e.target.value)}
                   />
-                  <button onClick={() => removeHeader(i)} className="text-zinc-700 hover:text-red-400 transition-colors shrink-0">
+                  <button onClick={() => removeHeader(i)} title="Remove header" aria-label="Remove header" className="text-zinc-700 hover:text-red-400 transition-colors shrink-0">
                     <X size={11} />
                   </button>
                 </div>

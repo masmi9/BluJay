@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 
 class ProxyFlowOut(BaseModel):
@@ -22,8 +22,15 @@ class ProxyFlowOut(BaseModel):
 
 
 class ProxyFlowDetail(ProxyFlowOut):
-    request_body: bytes | None
-    response_body: bytes | None
+    request_body: str | None
+    response_body: str | None
+
+    @field_validator('request_body', 'response_body', mode='before')
+    @classmethod
+    def decode_body(cls, v: bytes | str | None) -> str | None:
+        if isinstance(v, bytes):
+            return v.decode('utf-8', errors='replace')
+        return v
 
 
 class FlowsResponse(BaseModel):

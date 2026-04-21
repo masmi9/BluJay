@@ -345,8 +345,12 @@ async def run_active_scan(
                 parsed = urlparse(flow.get("url", ""))
                 if not parsed.scheme or not parsed.netloc:
                     continue
+
+                # If no query params, inject seed params so bare URLs are still tested
                 if not parse_qs(parsed.query):
-                    continue  # no params to test
+                    seed_params = ["id", "q", "search", "url", "redirect", "file", "path", "input", "page", "next"]
+                    seed_qs = urlencode({p: "test" for p in seed_params})
+                    flow = {**flow, "url": f"{flow.get('url', '')}?{seed_qs}"}
 
                 for check_name in checks:
                     runner = CHECK_RUNNERS.get(check_name)

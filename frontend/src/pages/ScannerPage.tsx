@@ -134,14 +134,14 @@ function UrlTargetInput({ urls, onChange }: { urls: string[]; onChange: (u: stri
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && add()}
         />
-        <button onClick={add} className="px-2 py-1 text-xs bg-bg-elevated border border-bg-border rounded text-zinc-400 hover:text-zinc-200">
+        <button onClick={add} title="Add URL" aria-label="Add URL" className="px-2 py-1 text-xs bg-bg-elevated border border-bg-border rounded text-zinc-400 hover:text-zinc-200">
           <Plus size={11} />
         </button>
       </div>
       {urls.map((u) => (
         <div key={u} className="flex items-center gap-1 bg-bg-elevated border border-bg-border rounded px-2 py-0.5">
           <span className="text-xs font-mono text-zinc-400 flex-1 truncate">{u}</span>
-          <button onClick={() => onChange(urls.filter((x) => x !== u))} className="text-zinc-600 hover:text-red-400">
+          <button onClick={() => onChange(urls.filter((x) => x !== u))} title={`Remove ${u}`} aria-label={`Remove ${u}`} className="text-zinc-600 hover:text-red-400">
             <X size={10} />
           </button>
         </div>
@@ -208,15 +208,46 @@ function PassiveUrlScan({ sessionId, onFindings }: {
 
 // ── Active scan launcher ──────────────────────────────────────────────────────
 
+const SCANNER_URLS_KEY = 'scanner-target-urls'
+
+export function addScannerUrl(url: string) {
+  try {
+    const existing: string[] = JSON.parse(localStorage.getItem(SCANNER_URLS_KEY) || '[]')
+    const normalized = url.startsWith('http') ? url : `https://${url}`
+    if (!existing.includes(normalized)) {
+      localStorage.setItem(SCANNER_URLS_KEY, JSON.stringify([...existing, normalized]))
+    }
+  } catch { /* ignore */ }
+}
+
 function ActiveScanPanel({ sessionId, onJobStarted }: {
   sessionId: number
   onJobStarted: (job: ActiveScanJob) => void
 }) {
   const [selectedChecks, setSelectedChecks] = useState<Set<string>>(new Set(ACTIVE_CHECKS))
   const [flowCount, setFlowCount] = useState(0)
-  const [targetUrls, setTargetUrls] = useState<string[]>([])
+  const [targetUrls, setTargetUrls] = useState<string[]>(() => {
+    try { return JSON.parse(localStorage.getItem(SCANNER_URLS_KEY) || '[]') } catch { return [] }
+  })
   const [launching, setLaunching] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const setAndPersistUrls = (urls: string[]) => {
+    setTargetUrls(urls)
+    localStorage.setItem(SCANNER_URLS_KEY, JSON.stringify(urls))
+  }
+
+  // Pick up URLs added from other pages (e.g. "Send to Scanner" in Proxy)
+  useEffect(() => {
+    const sync = () => {
+      try {
+        const stored: string[] = JSON.parse(localStorage.getItem(SCANNER_URLS_KEY) || '[]')
+        setTargetUrls(stored)
+      } catch { /* ignore */ }
+    }
+    window.addEventListener('storage', sync)
+    return () => window.removeEventListener('storage', sync)
+  }, [])
 
   const toggleCheck = (c: string) => setSelectedChecks((prev) => {
     const next = new Set(prev)
@@ -258,7 +289,7 @@ function ActiveScanPanel({ sessionId, onJobStarted }: {
         <Zap size={13} className="text-purple-400" /> Active Scan
       </p>
 
-      <UrlTargetInput urls={targetUrls} onChange={setTargetUrls} />
+      <UrlTargetInput urls={targetUrls} onChange={setAndPersistUrls} />
 
       <div className="space-y-1.5">
         <p className="text-xs text-zinc-600 uppercase tracking-wide">Checks</p>
@@ -276,6 +307,8 @@ function ActiveScanPanel({ sessionId, onJobStarted }: {
         <label className="text-xs text-zinc-600">Proxy flows</label>
         <input
           type="number" min={0} max={500} value={flowCount}
+          title="Number of proxy flows to scan"
+          aria-label="Number of proxy flows to scan"
           onChange={(e) => setFlowCount(Number(e.target.value))}
           className="w-16 bg-bg-elevated border border-bg-border rounded px-2 py-1 text-xs font-mono text-zinc-300 focus:outline-none focus:border-purple-500/50"
         />
@@ -480,6 +513,8 @@ export default function ScannerPage() {
             <select
               value={scanTypeFilter}
               onChange={(e) => setScanTypeFilter(e.target.value as typeof scanTypeFilter)}
+              aria-label="Filter by scan type"
+              title="Filter by scan type"
               className="bg-bg-elevated border border-bg-border rounded px-2 py-1 text-xs text-zinc-300 focus:outline-none"
             >
               <option value="all">All types</option>
@@ -487,7 +522,7 @@ export default function ScannerPage() {
               <option value="active">Active</option>
             </select>
             <span className="text-xs text-zinc-600">{allFindings.length} findings</span>
-            <button onClick={clearAll} className="p-1 text-zinc-600 hover:text-zinc-200">
+            <button onClick={clearAll} title="Clear all findings" aria-label="Clear all findings" className="p-1 text-zinc-600 hover:text-zinc-200">
               <Trash2 size={13} />
             </button>
           </div>
