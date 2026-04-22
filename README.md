@@ -1,6 +1,30 @@
-# BluJay
+```
+██████╗ ██╗     ██╗   ██╗     ██╗ █████╗ ██╗   ██╗
+██╔══██╗██║     ██║   ██║     ██║██╔══██╗╚██╗ ██╔╝
+██████╔╝██║     ██║   ██║     ██║███████║ ╚████╔╝ 
+██╔══██╗██║     ██║   ██║██   ██║██╔══██║  ╚██╔╝  
+██████╔╝███████╗╚██████╔╝╚██████╔╝██║  ██║   ██║   
+╚═════╝ ╚══════╝ ╚═════╝  ╚═════╝ ╚═╝  ╚═╝   ╚═╝   
+```
 
-A mobile application security analysis platform for Android and iOS. BluJay combines static analysis, dynamic instrumentation, traffic interception, OWASP MASVS compliance scanning, autonomous backend pentesting, and local AI-powered triage into a single unified interface.
+A mobile application security analysis platform for Android and iOS. BluJay combines static analysis, dynamic instrumentation, traffic interception, active/passive scanning, race condition testing, OWASP MASVS compliance scanning, autonomous backend pentesting, APK repackaging, passive recon, WebSocket/GraphQL testing, and local AI-powered triage into a single unified interface.
+
+## Navigation
+
+The sidebar is organized into consolidated modules:
+
+| Tab | Contains |
+|-----|---------|
+| **Proxy** | Traffic capture, Repeater (Enhanced/Raw), Race Conditions |
+| **API + Scanner** | Scanner, API Testing, Brute Force, WebSocket, GraphQL, Recon, Repackage, Strix Pentest |
+| **Frida** | Dynamic instrumentation |
+| **OWASP Scanner** | MASVS compliance scanning |
+| **Agent Console** | AI-assisted Android analysis |
+| **Decode** | TLS Audit, JWT Testing, AI Triage |
+| **Diff / Change Detection** | APK/IPA version comparison |
+| **Multi-APK Campaign** | Batch analysis across app versions |
+| **Testing Lab** | Manual test scripts |
+| **Settings** | Tool paths, proxy port, log level |
 
 ## Features
 
@@ -12,21 +36,66 @@ A mobile application security analysis platform for Android and iOS. BluJay comb
 - **iOS Syslog** — Live syslog streaming from connected iOS devices via libimobiledevice
 
 ### Network & API
+- **Scanner (Passive)** — Runs automatically on every proxied flow. Checks for missing security headers, insecure cookies, reflected input, sensitive data exposure, info disclosure, and CORS misconfigurations
+- **Scanner (Active)** — Sends crafted payloads against target URLs or proxy flows to detect reflected XSS, SQL injection (error-based), open redirect, path traversal, and SSRF. URLs without query parameters are automatically seeded with common parameter names
+- **Race Conditions** — HTTP/2 single-packet attack engine built into the Repeater. Switch to the Race Conditions sub-tab, set a thread count (1–50), and fire all requests simultaneously. Anomalous responses (different status or body size) are highlighted red — the key indicator of a race condition window
 - **TLS Audit** — Validate certificate pinning and TLS configuration
 - **JWT Testing** — Decode, forge, and test JWT tokens from intercepted traffic
-- **API Testing** — Active API security test suite for IDOR sweeps, auth stripping, token replay, and cross-user authorization checks. Dynamically activated by linking a proxy session — flows are parsed automatically to extract auth contexts, resource IDs, and suggested tests. Includes a full integrated API fuzzer (verb tampering, auth bypass, rate-limit detection) in the same module.
+- **API Testing** — Active API security test suite for IDOR sweeps, auth stripping, token replay, and cross-user authorization checks
 - **Brute Force** — Credential stuffing and rate-limit testing against login endpoints
+- **WebSocket Testing** — Connect to WS/WSS endpoints, probe with injection payloads, detect unauthenticated access, XSS reflection, prototype pollution, and JSON-RPC exposure. Auth-strip test included.
+- **GraphQL Testing** — Introspection detection, batching abuse, alias overload (DoS), field suggestion leakage, injection, and unauthenticated mutation detection.
+- **Recon** — Passive subdomain enumeration via certificate transparency (crt.sh) + DNS resolution + cloud storage bucket discovery (S3, GCS, Azure Blob). Derives bucket name candidates from APK package name. Feed results directly into Strix.
 - **Strix Pentest Agent** — Autonomous AI-driven pentesting of backend targets (APIs, servers) discovered during mobile analysis. Runs multi-agent recon → exploit → PoC validation in a Docker sandbox. Findings are proof-of-concept validated before being reported.
+
+### APK Repackage + Resign
+Decode, patch, recompile, and re-sign an APK in one click from the **Repackage** tab:
+
+| Patch | What it does |
+|-------|-------------|
+| **SSL Pinning Bypass** | Injects `network_security_config.xml` to trust all CAs including user-installed mitmproxy cert |
+| **Root Detection Bypass** | Stubs common root-check smali methods (`isRooted`, `checkRoot`, `detectRoot`, etc.) to always return false |
+| **Force Debuggable** | Sets `android:debuggable="true"` in `AndroidManifest.xml` for dynamic attach |
+| **Enable ADB Backup** | Sets `android:allowBackup="true"` for `adb backup` data extraction |
+
+The patched APK is re-signed with a generated debug keystore (`blujay-debug.keystore`) and available for immediate download.
 
 ### Static Analysis Improvements
 - **iOS Risk Scoring** — Calibrated risk scorer (denominator 1000) prevents score inflation on large commercial binaries
 - **iOS Finding Enrichment** — All iOS findings now carry `impact`, `attack_path`, and `evidence` fields. Rule IDs cover ATS misconfigurations, binary secrets, entitlement abuse, insecure frameworks, and sensitive permissions
 - **Binary String Deduplication** — Scanner deduplicates findings per pattern (max 3 examples each) so a single binary with hundreds of weak-crypto references doesn't skew the risk score
+- **Deep Secrets Scanner** — 55+ patterns covering AWS, GCP, Azure, GitHub, GitLab, Stripe, Square, PayPal, Twilio, SendGrid, Mailgun, Slack, Auth0, Okta, Shopify, HubSpot, Docker Hub, npm, and more
 
 ### AI & Reporting
 - **AI Triage** — Local AI-powered vulnerability analysis using metatron-qwen (fine-tuned Qwen via Ollama). No cloud, no API keys. Accepts output from any scan module and returns severity classification, OWASP MASVS mapping, and remediation steps. Includes consolidated session reports that correlate findings across all modules and identify attack chains.
 - **Agent Console** — AI-assisted Android agent for manifest analysis, permission auditing, exported component enumeration, and IPC analysis
 - **Risk Scoring** — Unified risk score across all findings for a session
+- **HTML Report Export** — Self-contained HTML report (inline CSS, dark theme) covering static findings, OWASP results, and network scanner findings. Download from any completed analysis.
+- **SARIF Export** — SARIF 2.1.0 output compatible with GitHub Code Scanning, GitLab SAST, and any CI/CD pipeline that supports the standard. Export button on every analysis page.
+
+### CI/CD Headless Mode
+Run BluJay scans without the frontend from any pipeline:
+
+```bash
+# Install requests (only external dep for the CLI)
+pip install requests
+
+# Scan and export SARIF (for GitHub Actions / GitLab CI)
+python backend/cli.py scan --apk app.apk --format sarif --output results.sarif
+
+# Fail the build if any high/critical findings are present
+python backend/cli.py scan --apk app.apk --fail-on high
+```
+
+Add to **GitHub Actions**:
+```yaml
+- name: BluJay scan
+  run: python backend/cli.py scan --apk app/build/outputs/apk/release/app.apk --format sarif --output blujay.sarif --fail-on high
+- name: Upload SARIF
+  uses: github/codeql-action/upload-sarif@v3
+  with:
+    sarif_file: blujay.sarif
+```
 
 ### Device Management
 - **Dashboard** — Android (ADB) and iOS (libimobiledevice) device management, one-click Pull & Analyze

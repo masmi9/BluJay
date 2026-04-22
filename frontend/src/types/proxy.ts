@@ -26,6 +26,15 @@ export interface RepeaterResponse {
   duration_ms: number
 }
 
+export interface RaceResult {
+  idx: number
+  status: number
+  length: number
+  duration_ms: number
+  body_snippet: string
+  error: string
+}
+
 export interface RepeaterTab {
   id: string
   label: string
@@ -35,4 +44,7 @@ export interface RepeaterTab {
   body: string
   response: RepeaterResponse | null
   loading: boolean
+  raceCount: number
+  raceResults: RaceResult[]
+  raceRunning: boolean
 }

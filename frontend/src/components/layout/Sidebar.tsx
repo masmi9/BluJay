@@ -1,20 +1,15 @@
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Search, Radio, Zap, Terminal, Shield, FlaskConical, Settings, Lock, Key, KeyRound, Radar, Brain, TestTube2, GitCompare, Layers, ShieldAlert } from 'lucide-react'
+import { LayoutDashboard, Search, Radio, Zap, Terminal, Shield, FlaskConical, Settings, ShieldAlert, Unplug, GitCompare, Layers } from 'lucide-react'
 import { clsx } from 'clsx'
 
 const NAV = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/proxy', icon: Radio, label: 'Proxy' },
-  { to: '/scanner', icon: ShieldAlert, label: 'Scanner' },
+  { to: '/api-scanner', icon: ShieldAlert, label: 'API + Scanner' },
   { to: '/frida', icon: Zap, label: 'Frida' },
   { to: '/owasp', icon: Shield, label: 'OWASP Scanner' },
   { to: '/agent', icon: Terminal, label: 'Agent Console' },
-  { to: '/tls', icon: Lock, label: 'TLS Audit' },
-  { to: '/jwt', icon: Key, label: 'JWT Testing' },
-  { to: '/api-testing', icon: TestTube2, label: 'API Testing' },
-  { to: '/brute-force', icon: KeyRound, label: 'Brute Force' },
-  { to: '/strix', icon: Radar, label: 'Strix Pentest' },
-  { to: '/ai-triage', icon: Brain, label: 'AI Triage' },
+  { to: '/decode', icon: Unplug, label: 'Decode' },
   { to: '/diff', icon: GitCompare, label: 'Diff / Change Detection' },
   { to: '/campaigns', icon: Layers, label: 'Multi-APK Campaign' },
   { to: '/testing', icon: FlaskConical, label: 'Testing Lab' },

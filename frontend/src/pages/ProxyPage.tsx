@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Virtuoso } from 'react-virtuoso'
-import { Play, Square, Trash2, Download, RefreshCw, Smartphone, X, Plus, Send, ChevronDown, Clipboard, Check, Apple, Radio, Filter, ShieldAlert } from 'lucide-react'
+import { Play, Square, Trash2, Download, RefreshCw, Smartphone, X, Plus, Send, ChevronDown, Clipboard, Check, Apple, Radio, Filter, ShieldAlert, Zap } from 'lucide-react'
 import { clsx } from 'clsx'
 import { proxyApi } from '@/api/proxy'
 import { addScannerUrl } from '@/pages/ScannerPage'
@@ -27,6 +27,9 @@ function makeTab(overrides: Partial<RepeaterTab> = {}): RepeaterTab {
     body: '',
     response: null,
     loading: false,
+    raceCount: 10,
+    raceResults: [],
+    raceRunning: false,
     ...overrides,
   }
 }
@@ -832,11 +835,214 @@ function FlowDetailPanel({ flow, onSendToRepeater }: {
 
 // ─── Repeater panel ───────────────────────────────────────────────────────────
 
+// ─── Race panel ───────────────────────────────────────────────────────────────
+
+function RacePanel({ tab, onChange }: {
+  tab: RepeaterTab
+  onChange: (patch: Partial<RepeaterTab>) => void
+}) {
+  const run = async () => {
+    if (!tab.url) return
+    onChange({ raceRunning: true, raceResults: [] })
+    try {
+      const headersObj = Object.fromEntries(
+        tab.headers.filter((h) => h.key.trim()).map((h) => [h.key.trim(), h.value])
+      )
+      const res = await import('axios').then((ax) =>
+        ax.default.post('/api/v1/race/run', {
+          method: tab.method,
+          url: tab.url,
+          headers: headersObj,
+          body: tab.body,
+          count: tab.raceCount,
+        })
+      )
+      onChange({ raceResults: res.data.results, raceRunning: false })
+    } catch (e: any) {
+      onChange({ raceRunning: false })
+    }
+  }
+
+  const results = tab.raceResults
+  const statuses = results.map((r) => r.status).filter(Boolean)
+  const uniqueStatuses = [...new Set(statuses)]
+  const minMs = results.length ? Math.min(...results.map((r) => r.duration_ms)) : 0
+  const maxMs = results.length ? Math.max(...results.map((r) => r.duration_ms)) : 0
+
+  return (
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* Controls */}
+      <div className="flex items-center gap-3 px-3 py-2 border-b border-bg-border bg-bg-surface shrink-0">
+        <span className="text-xs text-zinc-500 font-mono truncate flex-1">{tab.url || 'No URL set — configure in Repeater'}</span>
+        <label className="text-xs text-zinc-500">Requests</label>
+        <input
+          type="number" min={1} max={50} value={tab.raceCount}
+          onChange={(e) => onChange({ raceCount: Number(e.target.value) })}
+          title="Number of concurrent requests"
+          aria-label="Number of concurrent requests"
+          className="w-16 bg-bg-elevated border border-bg-border rounded px-2 py-1 text-xs font-mono text-zinc-300 focus:outline-none focus:border-red-500/50"
+        />
+        <button
+          onClick={run}
+          disabled={tab.raceRunning || !tab.url}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-red-500/20 text-red-400 hover:bg-red-500/30 rounded disabled:opacity-40 transition-colors font-medium"
+          title="Fire all requests simultaneously"
+        >
+          {tab.raceRunning
+            ? <><RefreshCw size={12} className="animate-spin" /> Racing…</>
+            : <><Zap size={12} /> Race</>}
+        </button>
+      </div>
+
+      {/* Summary */}
+      {results.length > 0 && (
+        <div className="flex items-center gap-4 px-3 py-1.5 bg-bg-elevated border-b border-bg-border shrink-0 text-xs">
+          <span className="text-zinc-500">{results.length} requests</span>
+          <span className="text-zinc-500">Statuses: <span className="text-zinc-300">{uniqueStatuses.join(', ') || '—'}</span></span>
+          <span className="text-zinc-500">Fastest: <span className="text-green-400">{minMs}ms</span></span>
+          <span className="text-zinc-500">Slowest: <span className="text-amber-400">{maxMs}ms</span></span>
+          <span className="text-zinc-500">Spread: <span className={clsx(maxMs - minMs > 50 ? 'text-red-400' : 'text-zinc-300')}>{(maxMs - minMs).toFixed(1)}ms</span></span>
+        </div>
+      )}
+
+      {/* Results table */}
+      <div className="flex-1 overflow-auto">
+        {results.length === 0 && !tab.raceRunning && (
+          <div className="flex flex-col items-center justify-center h-full text-zinc-600 gap-2">
+            <Zap size={28} />
+            <p className="text-sm">No results yet</p>
+            <p className="text-xs text-center max-w-xs">
+              Set up your request in the Repeater tab, then click Race to fire {tab.raceCount} simultaneous requests.
+              Look for differing status codes or response sizes — those indicate a race condition window.
+            </p>
+          </div>
+        )}
+        {results.length > 0 && (
+          <table className="w-full text-xs font-mono">
+            <thead className="sticky top-0 bg-bg-surface border-b border-bg-border">
+              <tr className="text-zinc-500">
+                <th className="text-left px-3 py-1.5 w-10">#</th>
+                <th className="text-left px-3 py-1.5 w-16">Status</th>
+                <th className="text-left px-3 py-1.5 w-20">Length</th>
+                <th className="text-left px-3 py-1.5 w-24">Time</th>
+                <th className="text-left px-3 py-1.5">Response snippet / Error</th>
+              </tr>
+            </thead>
+            <tbody>
+              {results.map((r) => {
+                const isAnomaly = r.status !== results[0].status || Math.abs(r.length - results[0].length) > 20
+                return (
+                  <tr key={r.idx} className={clsx(
+                    'border-b border-bg-border/50 hover:bg-bg-elevated transition-colors',
+                    isAnomaly && 'bg-red-500/5'
+                  )}>
+                    <td className="px-3 py-1 text-zinc-600">{r.idx + 1}</td>
+                    <td className="px-3 py-1">
+                      <span className={clsx(
+                        r.status === 0 ? 'text-red-400' :
+                        r.status >= 500 ? 'text-red-400' :
+                        r.status >= 400 ? 'text-amber-400' :
+                        r.status >= 300 ? 'text-yellow-400' : 'text-green-400'
+                      )}>{r.status || 'ERR'}</span>
+                    </td>
+                    <td className="px-3 py-1 text-zinc-400">{r.length}</td>
+                    <td className="px-3 py-1 text-zinc-400">{r.duration_ms}ms</td>
+                    <td className="px-3 py-1 text-zinc-500 truncate max-w-xs">
+                      {r.error || r.body_snippet}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── Raw ↔ structured helpers ──────────────────────────────────────────────────
+
+function tabToRaw(tab: RepeaterTab): string {
+  let path = '/'
+  let host = ''
+  try {
+    const u = new URL(tab.url)
+    path = u.pathname + u.search + u.hash || '/'
+    host = u.host
+  } catch { /* bad url */ }
+
+  const lines: string[] = [`${tab.method} ${path} HTTP/1.1`]
+  if (host) lines.push(`Host: ${host}`)
+  for (const h of tab.headers) {
+    if (h.key.trim()) lines.push(`${h.key}: ${h.value}`)
+  }
+  lines.push('')
+  if (tab.body) {
+    try { lines.push(JSON.stringify(JSON.parse(tab.body), null, 2)) }
+    catch { lines.push(tab.body) }
+  }
+  return lines.join('\n')
+}
+
+function rawToTab(raw: string, existingUrl: string): Partial<RepeaterTab> {
+  const lines = raw.split('\n')
+  const firstLine = lines[0]?.trim() ?? ''
+  const parts = firstLine.split(/\s+/)
+  const method = parts[0] || 'GET'
+  const path = parts[1] || '/'
+
+  const headers: { key: string; value: string }[] = []
+  let host = ''
+  let bodyStart = lines.length
+
+  for (let i = 1; i < lines.length; i++) {
+    if (lines[i].trim() === '') { bodyStart = i + 1; break }
+    const colon = lines[i].indexOf(':')
+    if (colon > 0) {
+      const key = lines[i].slice(0, colon).trim()
+      const value = lines[i].slice(colon + 1).trim()
+      if (key.toLowerCase() === 'host') host = value
+      else headers.push({ key, value })
+    }
+  }
+
+  const body = lines.slice(bodyStart).join('\n').trimEnd()
+
+  let url = existingUrl
+  try {
+    const base = new URL(existingUrl)
+    url = host ? `${base.protocol}//${host}${path}` : `${base.origin}${path}`
+  } catch {
+    if (host) url = `https://${host}${path}`
+  }
+
+  return { method, url, headers, body }
+}
+
 function RepeaterPanel({ tab, onChange, onSend }: {
   tab: RepeaterTab
   onChange: (patch: Partial<RepeaterTab>) => void
   onSend: () => void
 }) {
+  const [viewMode, setViewMode] = useState<'enhanced' | 'raw'>(() =>
+    (localStorage.getItem('repeater-view-mode') as 'enhanced' | 'raw') ?? 'enhanced'
+  )
+  const [rawText, setRawText] = useState(() => tabToRaw(tab))
+
+  // When switching TO raw, regenerate from tab state
+  const switchMode = (m: 'enhanced' | 'raw') => {
+    if (m === 'raw') setRawText(tabToRaw(tab))
+    setViewMode(m)
+    localStorage.setItem('repeater-view-mode', m)
+  }
+
+  // Raw text change → parse and sync to tab state
+  const handleRawChange = (val: string) => {
+    setRawText(val)
+    onChange(rawToTab(val, tab.url))
+  }
+
   const addHeader = () => onChange({ headers: [...tab.headers, { key: '', value: '' }] })
   const removeHeader = (i: number) => onChange({ headers: tab.headers.filter((_, idx) => idx !== i) })
   const updateHeader = (i: number, field: 'key' | 'value', val: string) => {
@@ -859,27 +1065,52 @@ function RepeaterPanel({ tab, onChange, onSend }: {
 
   const requestEditor = (
     <div className="flex flex-col h-full overflow-hidden">
-      {/* URL bar */}
+      {/* Toolbar: URL bar (BluJay mode) or just Send (Raw mode) */}
       <div className="flex items-center gap-2 px-3 py-2 border-b border-bg-border bg-bg-surface shrink-0">
-        <div className="relative">
-          <select
-            value={tab.method}
-            onChange={(e) => onChange({ method: e.target.value })}
-            aria-label="HTTP method"
-            title="HTTP method"
-            className="appearance-none bg-bg-elevated border border-bg-border rounded px-2 py-1.5 text-xs font-mono text-zinc-200 pr-6 focus:outline-none focus:border-accent"
-          >
-            {METHODS.map((m) => <option key={m}>{m}</option>)}
-          </select>
-          <ChevronDown size={10} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
+        {viewMode === 'enhanced' && (
+          <>
+            <div className="relative">
+              <select
+                value={tab.method}
+                onChange={(e) => onChange({ method: e.target.value })}
+                aria-label="HTTP method"
+                title="HTTP method"
+                className="appearance-none bg-bg-elevated border border-bg-border rounded px-2 py-1.5 text-xs font-mono text-zinc-200 pr-6 focus:outline-none focus:border-accent"
+              >
+                {METHODS.map((m) => <option key={m}>{m}</option>)}
+              </select>
+              <ChevronDown size={10} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
+            </div>
+            <input
+              className="flex-1 bg-bg-elevated border border-bg-border rounded px-2 py-1.5 text-xs font-mono text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-accent"
+              placeholder="https://api.example.com/endpoint"
+              value={tab.url}
+              onChange={(e) => onChange({ url: e.target.value })}
+              onKeyDown={(e) => e.key === 'Enter' && onSend()}
+            />
+          </>
+        )}
+        {viewMode === 'raw' && (
+          <span className="text-xs font-mono text-zinc-500 flex-1 truncate">{tab.url || 'Edit the request line below'}</span>
+        )}
+
+        {/* View mode toggle */}
+        <div className="flex items-center rounded border border-bg-border overflow-hidden shrink-0">
+          {(['enhanced', 'raw'] as const).map((m) => (
+            <button
+              key={m}
+              onClick={() => switchMode(m)}
+              title={m === 'enhanced' ? 'Enhanced split view' : 'Raw HTTP (Burp style)'}
+              className={clsx(
+                'px-2 py-1 text-xs transition-colors capitalize',
+                viewMode === m ? 'bg-accent text-white' : 'text-zinc-500 hover:text-zinc-200 hover:bg-bg-elevated'
+              )}
+            >
+              {m === 'enhanced' ? 'Enhanced' : 'Raw'}
+            </button>
+          ))}
         </div>
-        <input
-          className="flex-1 bg-bg-elevated border border-bg-border rounded px-2 py-1.5 text-xs font-mono text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-accent"
-          placeholder="https://api.example.com/endpoint"
-          value={tab.url}
-          onChange={(e) => onChange({ url: e.target.value })}
-          onKeyDown={(e) => e.key === 'Enter' && onSend()}
-        />
+
         <button
           onClick={onSend}
           disabled={tab.loading || !tab.url}
@@ -890,58 +1121,71 @@ function RepeaterPanel({ tab, onChange, onSend }: {
         </button>
       </div>
 
-      {/* Headers + body */}
-      <SplitPane
-        direction="horizontal"
-        defaultSplit={40}
-        className="flex-1"
-        left={
-          <div className="flex flex-col h-full overflow-hidden">
-            <div className="flex items-center justify-between px-3 py-1.5 border-b border-bg-border shrink-0">
-              <span className="text-xs text-zinc-600 uppercase tracking-wide">Headers</span>
-              <button onClick={addHeader} title="Add header" aria-label="Add header" className="text-zinc-600 hover:text-zinc-300 transition-colors">
-                <Plus size={12} />
-              </button>
+      {/* Enhanced split view */}
+      {viewMode === 'enhanced' && (
+        <SplitPane
+          direction="horizontal"
+          defaultSplit={40}
+          className="flex-1"
+          left={
+            <div className="flex flex-col h-full overflow-hidden">
+              <div className="flex items-center justify-between px-3 py-1.5 border-b border-bg-border shrink-0">
+                <span className="text-xs text-zinc-600 uppercase tracking-wide">Headers</span>
+                <button onClick={addHeader} title="Add header" aria-label="Add header" className="text-zinc-600 hover:text-zinc-300 transition-colors">
+                  <Plus size={12} />
+                </button>
+              </div>
+              <div className="flex-1 overflow-auto p-2 space-y-1">
+                {tab.headers.map((h, i) => (
+                  <div key={i} className="flex items-center gap-1">
+                    <input
+                      className="w-36 bg-bg-elevated border border-bg-border rounded px-2 py-1 text-xs font-mono text-zinc-300 placeholder-zinc-600 focus:outline-none focus:border-accent"
+                      placeholder="Header-Name"
+                      value={h.key}
+                      onChange={(e) => updateHeader(i, 'key', e.target.value)}
+                    />
+                    <span className="text-zinc-600 text-xs">:</span>
+                    <input
+                      className="flex-1 bg-bg-elevated border border-bg-border rounded px-2 py-1 text-xs font-mono text-zinc-300 placeholder-zinc-600 focus:outline-none focus:border-accent"
+                      placeholder="value"
+                      value={h.value}
+                      onChange={(e) => updateHeader(i, 'value', e.target.value)}
+                    />
+                    <button onClick={() => removeHeader(i)} title="Remove header" aria-label="Remove header" className="text-zinc-700 hover:text-red-400 transition-colors shrink-0">
+                      <X size={11} />
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
-            <div className="flex-1 overflow-auto p-2 space-y-1">
-              {tab.headers.map((h, i) => (
-                <div key={i} className="flex items-center gap-1">
-                  <input
-                    className="w-36 bg-bg-elevated border border-bg-border rounded px-2 py-1 text-xs font-mono text-zinc-300 placeholder-zinc-600 focus:outline-none focus:border-accent"
-                    placeholder="Header-Name"
-                    value={h.key}
-                    onChange={(e) => updateHeader(i, 'key', e.target.value)}
-                  />
-                  <span className="text-zinc-600 text-xs">:</span>
-                  <input
-                    className="flex-1 bg-bg-elevated border border-bg-border rounded px-2 py-1 text-xs font-mono text-zinc-300 placeholder-zinc-600 focus:outline-none focus:border-accent"
-                    placeholder="value"
-                    value={h.value}
-                    onChange={(e) => updateHeader(i, 'value', e.target.value)}
-                  />
-                  <button onClick={() => removeHeader(i)} title="Remove header" aria-label="Remove header" className="text-zinc-700 hover:text-red-400 transition-colors shrink-0">
-                    <X size={11} />
-                  </button>
-                </div>
-              ))}
+          }
+          right={
+            <div className="flex flex-col h-full overflow-hidden">
+              <div className="px-3 py-1.5 border-b border-bg-border shrink-0">
+                <span className="text-xs text-zinc-600 uppercase tracking-wide">Body</span>
+              </div>
+              <textarea
+                className="flex-1 bg-transparent px-3 py-2 text-xs font-mono text-zinc-300 placeholder-zinc-600 resize-none focus:outline-none"
+                placeholder="Request body…"
+                value={tab.body}
+                onChange={(e) => onChange({ body: e.target.value })}
+                spellCheck={false}
+              />
             </div>
-          </div>
-        }
-        right={
-          <div className="flex flex-col h-full overflow-hidden">
-            <div className="px-3 py-1.5 border-b border-bg-border shrink-0">
-              <span className="text-xs text-zinc-600 uppercase tracking-wide">Body</span>
-            </div>
-            <textarea
-              className="flex-1 bg-transparent px-3 py-2 text-xs font-mono text-zinc-300 placeholder-zinc-600 resize-none focus:outline-none"
-              placeholder="Request body…"
-              value={tab.body}
-              onChange={(e) => onChange({ body: e.target.value })}
-              spellCheck={false}
-            />
-          </div>
-        }
-      />
+          }
+        />
+      )}
+
+      {/* Raw HTTP view */}
+      {viewMode === 'raw' && (
+        <textarea
+          className="flex-1 bg-transparent px-4 py-3 text-xs font-mono text-zinc-200 resize-none focus:outline-none leading-relaxed"
+          value={rawText}
+          onChange={(e) => handleRawChange(e.target.value)}
+          spellCheck={false}
+          aria-label="Raw HTTP request"
+        />
+      )}
     </div>
   )
 
@@ -999,13 +1243,39 @@ function RepeaterPanel({ tab, onChange, onSend }: {
     </div>
   )
 
+  const [mode, setMode] = useState<'repeater' | 'race'>('repeater')
+
   return (
-    <SplitPane
-      direction="vertical"
-      defaultSplit={50}
-      className="flex-1"
-      left={requestEditor}
-      right={responsePanel}
-    />
+    <div className="flex flex-col flex-1 overflow-hidden">
+      {/* Sub-tab toggle */}
+      <div className="flex border-b border-bg-border bg-bg-surface shrink-0">
+        {(['repeater', 'race'] as const).map((m) => (
+          <button
+            key={m}
+            onClick={() => setMode(m)}
+            className={clsx(
+              'flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium capitalize transition-colors',
+              mode === m ? 'text-zinc-200 border-b-2 border-accent' : 'text-zinc-500 hover:text-zinc-300'
+            )}
+          >
+            {m === 'race' && <Zap size={11} className="text-red-400" />}
+            {m === 'repeater' ? 'Repeater' : 'Race Conditions'}
+          </button>
+        ))}
+      </div>
+
+      {mode === 'repeater' && (
+        <SplitPane
+          direction="vertical"
+          defaultSplit={50}
+          className="flex-1"
+          left={requestEditor}
+          right={responsePanel}
+        />
+      )}
+      {mode === 'race' && (
+        <RacePanel tab={tab} onChange={onChange} />
+      )}
+    </div>
   )
 }

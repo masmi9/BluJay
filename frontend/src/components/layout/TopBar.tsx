@@ -38,7 +38,7 @@ export function TopBar() {
 
   return (
     <header className="h-10 flex items-center justify-between px-4 bg-bg-surface border-b border-bg-border shrink-0">
-      <span className="text-sm font-semibold tracking-wide text-blue-300">BluJay</span>
+      <pre className="text-blue-300 font-mono leading-none select-none" style={{ fontSize: '3.5px', letterSpacing: '0.02em' }}>{`██████╗ ██╗     ██╗   ██╗     ██╗ █████╗ ██╗   ██╗\n██╔══██╗██║     ██║   ██║     ██║██╔══██╗╚██╗ ██╔╝\n██████╔╝██║     ██║   ██║     ██║███████║ ╚████╔╝\n██╔══██╗██║     ██║   ██║██   ██║██╔══██║  ╚██╔╝\n██████╔╝███████╗╚██████╔╝╚██████╔╝██║  ██║   ██║\n╚═════╝ ╚══════╝ ╚═════╝  ╚═════╝ ╚═╝  ╚═╝   ╚═╝`}</pre>
       <div className="flex items-center gap-3 text-xs text-zinc-400">
         {/* Persistent Frida session indicator */}
         {attached && attachedPackage && (

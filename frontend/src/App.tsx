@@ -13,16 +13,11 @@ import TestingLab from '@/pages/TestingLab'
 import SettingsPage from '@/pages/Settings'
 import CvePage from '@/pages/CvePage'
 import WebViewPage from '@/pages/WebViewPage'
-import TlsAuditPage from '@/pages/TlsAuditPage'
-import JwtPage from '@/pages/JwtPage'
 import RiskPage from '@/pages/RiskPage'
-import BruteForcePage from '@/pages/BruteForcePage'
-import StrixPage from '@/pages/StrixPage'
-import AiTriagePage from '@/pages/AiTriagePage'
-import ApiTesting from '@/pages/ApiTesting'
 import DiffPage from '@/pages/DiffPage'
 import CampaignPage from '@/pages/CampaignPage'
-import ScannerPage from '@/pages/ScannerPage'
+import ApiScannerPage from '@/pages/ApiScannerPage'
+import DecodePage from '@/pages/DecodePage'
 
 export default function App() {
   return (
@@ -44,17 +39,20 @@ export default function App() {
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/cve/:id" element={<CvePage />} />
               <Route path="/webview/:id" element={<WebViewPage />} />
-              <Route path="/tls" element={<TlsAuditPage />} />
-              <Route path="/jwt" element={<JwtPage />} />
               <Route path="/risk/:id" element={<RiskPage />} />
-              <Route path="/fuzzing" element={<Navigate to="/api-testing" replace />} />
-              <Route path="/brute-force" element={<BruteForcePage />} />
-              <Route path="/strix" element={<StrixPage />} />
-              <Route path="/ai-triage" element={<AiTriagePage />} />
-              <Route path="/api-testing" element={<ApiTesting />} />
               <Route path="/diff" element={<DiffPage />} />
               <Route path="/campaigns" element={<CampaignPage />} />
-              <Route path="/scanner" element={<ScannerPage />} />
+              <Route path="/api-scanner" element={<ApiScannerPage />} />
+              <Route path="/decode" element={<DecodePage />} />
+              {/* Legacy redirects */}
+              <Route path="/scanner" element={<Navigate to="/api-scanner" replace />} />
+              <Route path="/api-testing" element={<Navigate to="/api-scanner" replace />} />
+              <Route path="/fuzzing" element={<Navigate to="/api-scanner" replace />} />
+              <Route path="/brute-force" element={<Navigate to="/api-scanner" replace />} />
+              <Route path="/strix" element={<Navigate to="/api-scanner" replace />} />
+              <Route path="/tls" element={<Navigate to="/decode" replace />} />
+              <Route path="/jwt" element={<Navigate to="/decode" replace />} />
+              <Route path="/ai-triage" element={<Navigate to="/decode" replace />} />
               <Route path="/ipa" element={<Navigate to="/owasp" replace />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

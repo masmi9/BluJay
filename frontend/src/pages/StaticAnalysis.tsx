@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Loader2, AlertCircle, ChevronRight, ChevronDown, File, Folder, RefreshCw, ShieldAlert, Code2 } from 'lucide-react'
+import { Loader2, AlertCircle, ChevronRight, ChevronDown, File, Folder, RefreshCw, ShieldAlert, Code2, FileDown } from 'lucide-react'
 import { RiskScoreCard } from '@/components/analysis/RiskScoreCard'
 import { riskApi } from '@/api/risk'
 import { clsx } from 'clsx'
@@ -126,6 +126,22 @@ export default function StaticAnalysis() {
                 >
                   <Code2 size={12} /> WebView JS
                 </button>
+                <a
+                  href={`/api/v1/report/analysis/${analysisId}`}
+                  download
+                  className="flex items-center gap-1 px-2 py-1 text-xs text-zinc-500 hover:text-green-400 rounded hover:bg-bg-elevated transition-colors"
+                  title="Export HTML report"
+                >
+                  <FileDown size={12} /> HTML
+                </a>
+                <a
+                  href={`/api/v1/report/analysis/${analysisId}/sarif`}
+                  download
+                  className="flex items-center gap-1 px-2 py-1 text-xs text-zinc-500 hover:text-purple-400 rounded hover:bg-bg-elevated transition-colors"
+                  title="Export SARIF report (GitHub Code Scanning / CI)"
+                >
+                  <FileDown size={12} /> SARIF
+                </a>
               </>
             )}
             <button

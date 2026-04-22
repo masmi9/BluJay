@@ -26,6 +26,12 @@ from api.objection import router as objection_router
 from api.diff import router as diff_router
 from api.campaign import router as campaign_router
 from api.scanner import router as scanner_router
+from api.race import router as race_router
+from api.report import router as report_router
+from api.repackage import router as repackage_router
+from api.ws_test import router as ws_test_router
+from api.graphql_test import router as graphql_test_router
+from api.recon import router as recon_router
 
 api_router = APIRouter()
 api_router.include_router(analysis_router, prefix="/analyses", tags=["analysis"])
@@ -54,6 +60,12 @@ api_router.include_router(objection_router, prefix="/objection", tags=["objectio
 api_router.include_router(diff_router, prefix="/diff", tags=["diff"])
 api_router.include_router(campaign_router, prefix="/campaigns", tags=["campaigns"])
 api_router.include_router(scanner_router, prefix="/scanner", tags=["scanner"])
+api_router.include_router(race_router, prefix="/race", tags=["race"])
+api_router.include_router(report_router, prefix="/report", tags=["report"])
+api_router.include_router(repackage_router, prefix="/repackage", tags=["repackage"])
+api_router.include_router(ws_test_router, prefix="/ws-test", tags=["ws-test"])
+api_router.include_router(graphql_test_router, prefix="/graphql-test", tags=["graphql-test"])
+api_router.include_router(recon_router, prefix="/recon", tags=["recon"])
 
 # Singletons initialised lazily (so imports don't fail before lifespan runs)
 _proxy_manager = None
