@@ -28,7 +28,8 @@ type TabId = typeof TABS[number]['id']
 export default function ApiScannerPage() {
   const [active, setActive] = useState<TabId>(() => {
     const stored = localStorage.getItem(STORAGE_KEY)
-    return (stored as TabId) ?? 'scanner'
+    const validIds = TABS.map((t) => t.id) as string[]
+    return validIds.includes(stored ?? '') ? (stored as TabId) : 'scanner'
   })
 
   const switchTab = (id: TabId) => {

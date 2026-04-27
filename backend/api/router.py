@@ -32,6 +32,7 @@ from api.repackage import router as repackage_router
 from api.ws_test import router as ws_test_router
 from api.graphql_test import router as graphql_test_router
 from api.recon import router as recon_router
+from api.pci import router as pci_router
 
 api_router = APIRouter()
 api_router.include_router(analysis_router, prefix="/analyses", tags=["analysis"])
@@ -66,6 +67,7 @@ api_router.include_router(repackage_router, prefix="/repackage", tags=["repackag
 api_router.include_router(ws_test_router, prefix="/ws-test", tags=["ws-test"])
 api_router.include_router(graphql_test_router, prefix="/graphql-test", tags=["graphql-test"])
 api_router.include_router(recon_router, prefix="/recon", tags=["recon"])
+api_router.include_router(pci_router, prefix="/pci", tags=["pci"])
 
 # Singletons initialised lazily (so imports don't fail before lifespan runs)
 _proxy_manager = None

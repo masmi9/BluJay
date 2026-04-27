@@ -1,0 +1,81 @@
+# BluJay PCI DSS Scope Configuration
+# Supports: YAML or JSON. Pass as text to POST /api/v1/pci/full-scan { scope_config: "..." }
+#
+# scan_profile options:
+#   web_only       — web checks only, no port scanning (fastest)
+#   external_pci   — unauthenticated external PCI validation (standard)
+#   full_cde       — full CDE sweep including internal ranges (thorough)
+
+scope:
+  name: "TikTok Ad Platform CDE Assessment"
+  description: "External PCI DSS v4.0 assessment of cardholder data environment"
+  scan_profile: "external_pci"
+
+  targets:
+    # URL targets — web checks + TLS validation
+    - type: url
+      value: "https://ads.tiktok.com"
+      label: "TikTok Ads Manager"
+    - type: url
+      value: "https://promote.tiktok.com"
+      label: "TikTok Promote"
+    - type: url
+      value: "https://live.tiktok.com"
+      label: "TikTok Live"
+
+    # Uncomment for IP/network targets:
+    # - type: ip
+    #   value: "203.0.113.10"
+    # - type: cidr
+    #   value: "203.0.113.0/28"
+    # - type: domain
+    #   value: "checkout.example.com"
+
+  web:
+    # Explicitly known payment entry points (always scanned)
+    payment_pages:
+      - "https://ads.tiktok.com/i18n/payment/"
+      - "https://promote.tiktok.com/billing"
+    entry_pages:
+      - "https://ads.tiktok.com/i18n/login/"
+
+    # Crawl URL include/exclude patterns (fnmatch style)
+    include_patterns:
+      - "*/payment*"
+      - "*/billing*"
+      - "*/checkout*"
+      - "*/pay*"
+      - "*/card*"
+      - "*/coinrecharge*"
+    exclude_patterns:
+      - "*/logout*"
+      - "*/static/*"
+      - "*/cdn/*"
+      - "*.js"
+      - "*.css"
+      - "*.png"
+      - "*.jpg"
+
+    max_depth: 3
+    max_pages: 50
+
+    file_types:
+      - ".html"
+      - ".htm"
+      - ".php"
+      - ".asp"
+      - ".aspx"
+
+  ports:
+    # pci_standard: ~30 key ports  |  pci_full: all 1-1024 + common high ports
+    profile: "pci_standard"
+    custom: []   # used when profile = "custom"
+
+  checks:
+    host_discovery: true
+    port_scan: true
+    vulnerability: true
+    web_scan: true
+    brute_exposure: true
+    malware: true
+    tls: true

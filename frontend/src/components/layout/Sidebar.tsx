@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Search, Radio, Zap, Terminal, Shield, FlaskConical, Settings, ShieldAlert, Unplug, GitCompare, Layers } from 'lucide-react'
+import { LayoutDashboard, Search, Radio, Zap, Terminal, Shield, FlaskConical, Settings, ShieldAlert, Unplug, GitCompare, Layers, CreditCard } from 'lucide-react'
 import { clsx } from 'clsx'
 
 const NAV = [
@@ -8,6 +8,7 @@ const NAV = [
   { to: '/api-scanner', icon: ShieldAlert, label: 'API + Scanner' },
   { to: '/frida', icon: Zap, label: 'Frida' },
   { to: '/owasp', icon: Shield, label: 'OWASP Scanner' },
+  { to: '/pci', icon: CreditCard, label: 'PCI DSS Scanner' },
   { to: '/agent', icon: Terminal, label: 'Agent Console' },
   { to: '/decode', icon: Unplug, label: 'Decode' },
   { to: '/diff', icon: GitCompare, label: 'Diff / Change Detection' },

@@ -32,6 +32,7 @@ import models.brute_force  # noqa: F401
 import models.api_testing    # noqa: F401
 import models.analysis_diff  # noqa: F401
 import models.campaign       # noqa: F401
+import models.pci            # noqa: F401
 
 logger = structlog.get_logger()
 

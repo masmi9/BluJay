@@ -18,6 +18,7 @@ import DiffPage from '@/pages/DiffPage'
 import CampaignPage from '@/pages/CampaignPage'
 import ApiScannerPage from '@/pages/ApiScannerPage'
 import DecodePage from '@/pages/DecodePage'
+import PciTestPage from '@/pages/PciTestPage'
 
 export default function App() {
   return (
@@ -44,6 +45,7 @@ export default function App() {
               <Route path="/campaigns" element={<CampaignPage />} />
               <Route path="/api-scanner" element={<ApiScannerPage />} />
               <Route path="/decode" element={<DecodePage />} />
+              <Route path="/pci" element={<PciTestPage />} />
               {/* Legacy redirects */}
               <Route path="/scanner" element={<Navigate to="/api-scanner" replace />} />
               <Route path="/api-testing" element={<Navigate to="/api-scanner" replace />} />
