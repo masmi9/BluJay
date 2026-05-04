@@ -1,18 +1,19 @@
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Search, Radio, Zap, Terminal, Shield, FlaskConical, Settings, ShieldAlert, Unplug, GitCompare, Layers, CreditCard } from 'lucide-react'
+import { LayoutDashboard, Search, Radio, Zap, Terminal, Shield, FlaskConical, Settings, ShieldAlert, Unplug, GitCompare, ClipboardCheck, CreditCard, Flag } from 'lucide-react'
 import { clsx } from 'clsx'
 
 const NAV = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/proxy', icon: Radio, label: 'Proxy' },
   { to: '/api-scanner', icon: ShieldAlert, label: 'API + Scanner' },
+  { to: '/ctf', icon: Flag, label: 'CTF Mode' },
   { to: '/frida', icon: Zap, label: 'Frida' },
   { to: '/owasp', icon: Shield, label: 'OWASP Scanner' },
   { to: '/pci', icon: CreditCard, label: 'PCI DSS Scanner' },
   { to: '/agent', icon: Terminal, label: 'Agent Console' },
   { to: '/decode', icon: Unplug, label: 'Decode' },
   { to: '/diff', icon: GitCompare, label: 'Diff / Change Detection' },
-  { to: '/campaigns', icon: Layers, label: 'Multi-APK Campaign' },
+  { to: '/checklist', icon: ClipboardCheck, label: 'Testing Checklist' },
   { to: '/testing', icon: FlaskConical, label: 'Testing Lab' },
   { to: '/settings', icon: Settings, label: 'Settings' },
 ]

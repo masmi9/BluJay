@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { Upload, CheckCircle, XCircle, Loader2, Package, Smartphone, Search, ArrowRight, Tablet, ShieldCheck, ShieldOff, Trash2, Zap } from 'lucide-react'
+import { Upload, CheckCircle, XCircle, Loader2, Package, Smartphone, Search, ArrowRight, Tablet, ShieldCheck, ShieldOff, Trash2, Zap, RefreshCw } from 'lucide-react'
 import { clsx } from 'clsx'
 import { analysisApi } from '@/api/analysis'
 import { adbApi, sessionApi } from '@/api/adb'
@@ -393,22 +393,54 @@ export default function Dashboard() {
                   />
                 </div>
 
+                {/* frida-server hint: jailbroken device but no apps enumerated */}
+                {!iosAppsLoading && iosApps.length === 0 && iosDevices.find((d) => d.udid === effectiveIosUdid)?.jailbroken && (
+                  <div className="flex items-start gap-2 px-2 py-2 bg-amber-500/10 border border-amber-500/20 rounded text-xs">
+                    <span className="text-amber-400 shrink-0 mt-0.5">⚡</span>
+                    <div className="flex-1 space-y-0.5">
+                      <p className="text-amber-300 font-medium">frida-server not detected</p>
+                      <p className="text-zinc-500">
+                        Start <code className="text-zinc-400">frida-server</code> on your device to enumerate apps via frida-ios-dump. Alternatively, ensure <code className="text-zinc-400">ideviceinstaller</code> is installed.
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => queryClient.invalidateQueries({ queryKey: ['ios-apps', effectiveIosUdid] })}
+                      title="Retry app enumeration"
+                      className="text-zinc-500 hover:text-zinc-300 transition-colors shrink-0 mt-0.5"
+                    >
+                      <RefreshCw size={11} />
+                    </button>
+                  </div>
+                )}
+
                 {/* App list */}
                 {iosAppSearch && filteredIosApps.length > 0 && (
                   <div className="max-h-40 overflow-y-auto rounded border border-bg-border bg-bg-elevated divide-y divide-bg-border">
-                    {filteredIosApps.slice(0, 50).map((a) => (
-                      <button
-                        key={a.bundle_id}
-                        className={clsx(
-                          'w-full text-left px-3 py-2 text-xs hover:bg-bg-base transition-colors',
-                          selectedBundleId === a.bundle_id ? 'bg-accent/10' : ''
-                        )}
-                        onClick={() => { setSelectedBundleId(a.bundle_id); setIosAppSearch(a.name) }}
-                      >
-                        <p className={clsx('truncate font-medium', selectedBundleId === a.bundle_id ? 'text-accent' : 'text-zinc-200')}>{a.name}</p>
-                        <p className="text-zinc-500 font-mono truncate">{a.bundle_id}</p>
-                      </button>
-                    ))}
+                    {filteredIosApps.slice(0, 50).map((a) => {
+                      const hasName = a.name && a.name !== a.bundle_id
+                      return (
+                        <button
+                          key={a.bundle_id}
+                          className={clsx(
+                            'w-full text-left px-3 py-2 text-xs hover:bg-bg-base transition-colors',
+                            selectedBundleId === a.bundle_id ? 'bg-accent/10' : ''
+                          )}
+                          onClick={() => {
+                            setSelectedBundleId(a.bundle_id)
+                            setIosAppSearch(hasName ? a.name : a.bundle_id)
+                          }}
+                        >
+                          {hasName && (
+                            <p className={clsx('truncate font-medium', selectedBundleId === a.bundle_id ? 'text-accent' : 'text-zinc-200')}>
+                              {a.name}
+                            </p>
+                          )}
+                          <p className={clsx('font-mono truncate', hasName ? 'text-zinc-500' : (selectedBundleId === a.bundle_id ? 'text-accent' : 'text-zinc-300'))}>
+                            {a.bundle_id}
+                          </p>
+                        </button>
+                      )
+                    })}
                     {filteredIosApps.length > 50 && (
                       <p className="px-3 py-1.5 text-xs text-zinc-600">{filteredIosApps.length - 50} more — type more to narrow</p>
                     )}

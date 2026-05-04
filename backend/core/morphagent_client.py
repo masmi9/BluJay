@@ -120,6 +120,7 @@ class MorphAgentClient:
 # ── High-level command helpers ────────────────────────────────────────────────
 
 SUPPORTED_COMMANDS = [
+    # Standard Android analysis
     "manifest_analysis",
     "permission_audit",
     "package_enum",
@@ -129,6 +130,17 @@ SUPPORTED_COMMANDS = [
     "exploit_webview",
     "shell",
     "ping",
+    # Unity C2 — engine recon, memory exploitation, and runtime hooks
+    "unity_detect",        # Detect Unity version, IL2CPP vs Mono, game metadata
+    "unity_dump_il2cpp",   # Dump IL2CPP class/method/field metadata from live memory
+    "unity_read_prefs",    # Read all Unity PlayerPrefs (game state, tokens, flags)
+    "unity_write_prefs",   # Tamper a specific PlayerPrefs key-value pair
+    "unity_scan_memory",   # Scan process memory for hardcoded keys, secrets, URLs
+    "unity_hook_method",   # Install a Frida-based runtime hook on a Unity method
+    "unity_list_scenes",   # Enumerate loaded Unity scenes and GameObjects
+    "unity_exploit_socket",# Analyse/interact with Unity multiplayer sockets (UNET/Mirror/Photon)
+    "unity_bypass_ssl",    # Bypass SSL/TLS certificate pinning in Unity HTTPS calls
+    "unity_exploit_chain", # Full chain: detect → dump IL2CPP → scan memory → hook anti-cheat
 ]
 
 

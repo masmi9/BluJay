@@ -676,16 +676,40 @@ function IosSetupPanel({ iosDevices, localIp, allIps, proxyPort, proxyRunning, o
 
 // ─── Flow table ───────────────────────────────────────────────────────────────
 
+type DisplayFlow = ProxyFlow & { _count: number }
+
+function deduplicateFlows(flows: ProxyFlow[]): DisplayFlow[] {
+  const result: DisplayFlow[] = []
+  for (const flow of flows) {
+    const last = result[result.length - 1]
+    if (
+      last &&
+      last.method === flow.method &&
+      last.host === flow.host &&
+      last.path === flow.path &&
+      last.url === flow.url &&
+      last.request_headers === flow.request_headers
+    ) {
+      last._count++
+    } else {
+      result.push({ ...flow, _count: 1 })
+    }
+  }
+  return result
+}
+
 function FlowTable({ flows, selectedId, onSelect }: {
   flows: ProxyFlow[]
   selectedId: string | null
   onSelect: (id: string) => void
 }) {
+  const displayFlows = deduplicateFlows(flows)
+
   return (
     <div className="flex flex-col h-full">
       <div className="flex text-xs text-zinc-600 px-3 py-1.5 border-b border-bg-border bg-bg-surface font-mono">
         <span className="w-6 mr-2">#</span>
-        <span className="w-16">Method</span>
+        <span className="w-20">Method</span>
         <span className="w-32">Host</span>
         <span className="flex-1">Path</span>
         <span className="w-12 text-right">Status</span>
@@ -697,8 +721,8 @@ function FlowTable({ flows, selectedId, onSelect }: {
         ) : (
           <Virtuoso
             style={{ height: '100%' }}
-            data={flows}
-            itemContent={(index, flow: ProxyFlow) => (
+            data={displayFlows}
+            itemContent={(index, flow: DisplayFlow) => (
               <div
                 className={clsx(
                   'flex items-center px-3 py-1 text-xs font-mono cursor-pointer hover:bg-bg-elevated',
@@ -706,8 +730,13 @@ function FlowTable({ flows, selectedId, onSelect }: {
                 )}
                 onClick={() => onSelect(flow.id)}
               >
-                <span className="w-6 mr-2 text-zinc-600">{flows.length - index}</span>
-                <span className="w-16"><Badge variant="method" value={flow.method} /></span>
+                <span className="w-6 mr-2 text-zinc-600">{displayFlows.length - index}</span>
+                <span className="w-20 flex items-center gap-1.5">
+                  <Badge variant="method" value={flow.method} />
+                  {flow._count > 1 && (
+                    <span className="text-[10px] text-zinc-500 font-mono">×{flow._count}</span>
+                  )}
+                </span>
                 <span className="w-32 text-zinc-400 truncate">{flow.host}</span>
                 <span className="flex-1 text-zinc-300 truncate">{flow.path}</span>
                 <span className="w-12 text-right">

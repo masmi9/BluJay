@@ -7,7 +7,7 @@
 ╚═════╝ ╚══════╝ ╚═════╝  ╚═════╝ ╚═╝  ╚═╝   ╚═╝   
 ```
 
-A mobile application security analysis platform for Android and iOS. BluJay combines static analysis, dynamic instrumentation, traffic interception, active/passive scanning, race condition testing, OWASP MASVS compliance scanning, autonomous backend pentesting, APK repackaging, passive recon, WebSocket/GraphQL testing, and local AI-powered triage into a single unified interface.
+A mobile application security analysis platform for Android and iOS. BluJay combines static analysis, dynamic instrumentation, traffic interception, active/passive scanning, race condition testing, OWASP MASVS compliance scanning, autonomous backend pentesting, APK repackaging, passive recon, WebSocket/GraphQL testing, PCI DSS testing, and local AI-powered triage into a single unified interface.
 
 ## Navigation
 
@@ -22,8 +22,7 @@ The sidebar is organized into consolidated modules:
 | **Agent Console** | AI-assisted Android analysis |
 | **Decode** | TLS Audit, JWT Testing, AI Triage |
 | **Diff / Change Detection** | APK/IPA version comparison |
-| **Multi-APK Campaign** | Batch analysis across app versions |
-| **Testing Lab** | Manual test scripts |
+| **Testing Checklist** | OWASP MASVS (iOS & Android) + WSTG progress tracker |
 | **Settings** | Tool paths, proxy port, log level |
 
 ## Features
@@ -33,7 +32,17 @@ The sidebar is organized into consolidated modules:
 - **OWASP Scanner** — Full AODS (Android) and IODS (iOS) dynamic scans with MASVS compliance reporting
 - **Proxy / Traffic Capture** — mitmproxy integration with a custom addon for intercepting, persisting, and replaying HTTP/S traffic from Android and iOS devices
 - **Frida** — Dynamic instrumentation: attach to running apps, run scripts, hook methods in real time
+- **iOS IPA Dump** — Pull decrypted IPAs from jailbroken devices using Frida + SSH/SFTP (three-phase: Frida locates the bundle and writes the decrypted segment patch to `/tmp` on-device, SFTP downloads the full `.app` bundle, host applies the patch and packages a valid IPA)
 - **iOS Syslog** — Live syslog streaming from connected iOS devices via libimobiledevice
+
+### Testing Checklist
+Track progress across OWASP MASVS and WSTG test cases within a single engagement:
+
+- **Mobile tab (iOS / Android toggle)** — Full OWASP MASVS v2.0 test case list organized by control group (STORAGE, CRYPTO, AUTH, NETWORK, PLATFORM, CODE, RESILIENCE). Switch between iOS and Android checklists; progress is stored separately per platform.
+- **Web tab** — OWASP WSTG v4.2 test cases organized by section (INFO, CONFIG, AUTHN, AUTHZ, SESS, INPUT, ERR, CRYPT, BUSLOGIC, CLIENT, API).
+- Status cycle: `Not Started → In Progress → Pass → Fail` (click to cycle, per test case)
+- Per-category progress bars and an overall summary bar across all test cases
+- Persisted in browser localStorage per platform (`blujay_checklist_v1_mobile_ios`, `blujay_checklist_v1_mobile_android`, `blujay_checklist_v1_web`)
 
 ### Network & API
 - **Scanner (Passive)** — Runs automatically on every proxied flow. Checks for missing security headers, insecure cookies, reflected input, sensitive data exposure, info disclosure, and CORS misconfigurations
@@ -47,6 +56,13 @@ The sidebar is organized into consolidated modules:
 - **GraphQL Testing** — Introspection detection, batching abuse, alias overload (DoS), field suggestion leakage, injection, and unauthenticated mutation detection.
 - **Recon** — Passive subdomain enumeration via certificate transparency (crt.sh) + DNS resolution + cloud storage bucket discovery (S3, GCS, Azure Blob). Derives bucket name candidates from APK package name. Feed results directly into Strix.
 - **Strix Pentest Agent** — Autonomous AI-driven pentesting of backend targets (APIs, servers) discovered during mobile analysis. Runs multi-agent recon → exploit → PoC validation in a Docker sandbox. Findings are proof-of-concept validated before being reported.
+
+### PCI DSS Testing
+Interactive PCI DSS compliance test flow from the **PCI Testing** tab:
+
+- Structured test cases mapped to PCI DSS requirements
+- Live result tracking with pass/fail/pending states
+- Streaming output for long-running checks
 
 ### APK Repackage + Resign
 Decode, patch, recompile, and re-sign an APK in one click from the **Repackage** tab:
@@ -62,7 +78,7 @@ The patched APK is re-signed with a generated debug keystore (`blujay-debug.keys
 
 ### Static Analysis Improvements
 - **iOS Risk Scoring** — Calibrated risk scorer (denominator 1000) prevents score inflation on large commercial binaries
-- **iOS Finding Enrichment** — All iOS findings now carry `impact`, `attack_path`, and `evidence` fields. Rule IDs cover ATS misconfigurations, binary secrets, entitlement abuse, insecure frameworks, and sensitive permissions
+- **iOS Finding Enrichment** — All iOS findings carry `impact`, `attack_path`, and `evidence` fields. Rule IDs cover ATS misconfigurations, binary secrets, entitlement abuse, insecure frameworks, and sensitive permissions
 - **Binary String Deduplication** — Scanner deduplicates findings per pattern (max 3 examples each) so a single binary with hundreds of weak-crypto references doesn't skew the risk score
 - **Deep Secrets Scanner** — 55+ patterns covering AWS, GCP, Azure, GitHub, GitLab, Stripe, Square, PayPal, Twilio, SendGrid, Mailgun, Slack, Auth0, Okta, Shopify, HubSpot, Docker Hub, npm, and more
 
@@ -168,25 +184,59 @@ The **auto-triage** option on the Strix page feeds findings directly into metatr
 ```
 BluJay/
 ├── backend/
-│   ├── api/              # FastAPI routers (one per feature module)
-│   │   ├── strix.py      # Strix autonomous pentest integration
-│   │   └── ollama.py     # metatron-qwen AI triage integration
-│   ├── core/
-│   │   ├── proxy_addon.py  # mitmproxy addon script (runs as subprocess)
-│   │   └── proxy_manager.py
-│   └── models/           # SQLAlchemy ORM models
+│   ├── api/              # FastAPI routers — one file per feature module (35 total)
+│   │   ├── analysis.py, proxy.py, frida.py, owasp.py
+│   │   ├── strix.py, ollama.py, scanner.py, api_testing.py
+│   │   ├── repackage.py, recon.py, race.py, brute_force.py
+│   │   ├── ws_test.py, graphql_test.py, tls_audit.py, jwt_test.py
+│   │   ├── ios_devices.py, adb.py, pci.py, report.py, ...
+│   │   └── router.py     # registers all routers
+│   ├── core/             # Business logic and tool wrappers (52 modules)
+│   │   ├── proxy_manager.py, proxy_addon.py
+│   │   ├── apk_analyzer.py, ipa_analyzer.py
+│   │   ├── frida_manager.py, frida_dump.py
+│   │   ├── passive_scanner.py, active_scanner.py, secret_scanner.py
+│   │   ├── repackage_engine.py, recon_engine.py, race_engine.py
+│   │   ├── api_fuzzer.py, api_test_engine.py
+│   │   ├── pci_*.py      # PCI DSS testing modules
+│   │   ├── jadx_wrapper.py, apktool_wrapper.py
+│   │   ├── tool_detector.py, ios_device_manager.py
+│   │   └── risk_scorer.py, finding_enricher.py, ...
+│   ├── models/           # SQLAlchemy ORM models
+│   ├── schemas/          # Pydantic request/response schemas
+│   ├── migrations/       # Alembic database migrations
+│   ├── frida_scripts/    # Bundled Frida instrumentation scripts
+│   ├── wordlists/        # Security testing wordlists
+│   ├── config.py         # Pydantic-settings configuration
+│   ├── requirements.txt
+│   └── run.py            # Uvicorn entry point
 ├── frontend/
 │   ├── src/
-│   │   ├── pages/        # One page component per feature
-│   │   │   ├── StrixPage.tsx
-│   │   │   └── AiTriagePage.tsx
-│   │   ├── api/          # Axios API clients
+│   │   ├── pages/        # One page component per feature (30 total)
+│   │   │   ├── Dashboard.tsx, StaticAnalysis.tsx, DynamicAnalysis.tsx
+│   │   │   ├── ProxyPage.tsx, ScannerPage.tsx, ApiScannerPage.tsx
+│   │   │   ├── StrixPage.tsx, AiTriagePage.tsx, AgentConsole.tsx
+│   │   │   ├── RepackagePage.tsx, ReconPage.tsx, RiskPage.tsx
+│   │   │   ├── WsTestPage.tsx, GraphqlPage.tsx, PciTestPage.tsx
+│   │   │   ├── ChecklistPage.tsx   # MASVS + WSTG progress tracker
+│   │   │   └── Settings.tsx, ...
+│   │   ├── components/   # Shared UI components
+│   │   │   ├── layout/   # Sidebar, TopBar, StatusBar
+│   │   │   ├── common/   # Badge, CodeBlock, SplitPane
+│   │   │   └── analysis/ # RiskScoreCard, RiskGraph
+│   │   ├── api/          # Axios API client wrappers
+│   │   ├── hooks/        # Custom React hooks
+│   │   ├── store/        # Zustand state management
 │   │   └── types/        # TypeScript interfaces
+│   └── package.json
 ├── scanners/
-│   ├── aods/             # Android OWASP Dynamic Scanner (dyna.py)
-│   └── iods/             # iOS OWASP Dynamic Scanner (ios_scan.py)
-├── tools/                # apktool.jar, jadx, platform-tools (not committed)
-└── .gitignore
+│   ├── aods/             # Android OWASP Dynamic Scanner (dyna.py + venv)
+│   └── iods/             # iOS OWASP Dynamic Scanner (ios_scan.py + venv)
+├── scripts/
+│   ├── setup_windows.ps1 # Downloads apktool, jadx, platform-tools (Windows)
+│   └── setup_linux.sh    # Same for Linux/macOS/WSL
+├── tools/                # apktool.jar, jadx/, platform-tools/ — not committed
+└── docker/               # Strix sandbox configuration
 ```
 
 ## Prerequisites
@@ -205,6 +255,18 @@ BluJay/
 | Ollama + metatron-qwen | Local AI triage (no API key needed) |
 
 ## Quick Start
+
+### Tools
+
+```bash
+# Windows
+powershell -ExecutionPolicy Bypass -File scripts/setup_windows.ps1
+
+# Linux / macOS / WSL
+bash scripts/setup_linux.sh
+```
+
+This downloads `apktool.jar`, `jadx`, and Android `platform-tools` into `tools/`.
 
 ### Backend
 
@@ -263,10 +325,7 @@ export LLM_API_BASE=http://localhost:11434
 export STRIX_LLM=ollama/metatron-qwen
 ```
 
-> **Windows users:** Strix installs into WSL. If your BluJay backend runs in Windows Python, create a wrapper so `strix` is visible on the Windows PATH:
-> ```powershell
-> New-Item -Path "$env:USERPROFILE\AppData\Local\Microsoft\WindowsApps\strix.cmd" -Force -Value "@echo off`nwsl strix %*"
-> ```
+> **Windows users:** Strix installs into WSL. The backend detects it automatically via a WSL wrapper. If `strix` is not found, add it to your WSL PATH and ensure the WSL distribution is running.
 
 ### AI Triage (Ollama + metatron-qwen)
 
@@ -340,15 +399,36 @@ adb reverse --remove tcp:8080
 
 ## Configuration
 
-Copy `.env.example` to `backend/.env` and adjust paths as needed. Key settings:
+Copy `backend/.env` and adjust paths as needed. Tool path defaults in `config.py` resolve automatically relative to the repo root — only set them explicitly if your tools are installed elsewhere:
 
 ```env
+# Server
+HOST=127.0.0.1
+PORT=8000
+
+# Workspace
+WORKSPACE_DIR=~/.blujay
+
+# Tool paths — omit these to use the defaults (tools/ dir relative to repo root)
+# APKTOOL_JAR=/custom/path/apktool.jar
+# JADX_PATH=/custom/path/jadx
+# ADB_PATH=/custom/path/adb
+
+# Proxy
+PROXY_HOST=0.0.0.0
+PROXY_PORT=8089
+
+# Scanner paths
 AODS_PATH=scanners/aods/dyna.py
 AODS_VENV_PYTHON=scanners/aods/aods_venv/Scripts/python.exe
 IODS_PATH=scanners/iods/ios_scan.py
 IODS_VENV_PYTHON=scanners/iods/iods_venv/Scripts/python.exe
-APKTOOL_JAR=tools/apktool.jar
+
+# Logging: DEBUG | INFO | WARNING | ERROR
+LOG_LEVEL=INFO
 ```
+
+> **Important:** Do not set `APKTOOL_JAR`, `JADX_PATH`, or `ADB_PATH` to relative paths. Pydantic-settings resolves them relative to the working directory at server startup (`backend/`), not the repo root. The defaults in `config.py` use `Path(__file__).parent.parent` and resolve correctly without any override.
 
 ## API
 
@@ -373,10 +453,17 @@ Key endpoint groups:
 | `/brute-force` | Brute force jobs |
 | `/ios-devices` | iOS device management + pull-and-analyze |
 | `/devices` | Android (ADB) device management |
+| `/pci` | PCI DSS compliance testing |
+| `/scanner` | Passive + active web scanner |
+| `/recon` | Passive subdomain and cloud bucket enumeration |
+| `/repackage` | APK decode, patch, and resign |
+| `/race` | HTTP/2 race condition testing |
+| `/ws-test` | WebSocket security testing |
+| `/graphql-test` | GraphQL security testing |
 
 ## Workspace
 
-Runtime data (database, decompiled output, uploaded APKs/IPAs, mitmproxy certs, Strix run output) is stored in `~/.blujay/` and `~/strix_runs/` and is never committed.
+Runtime data (database, decompiled output, uploaded APKs/IPAs, mitmproxy certs, Strix run output) is stored in `~/.blujay/` and is never committed.
 
 ## License
 

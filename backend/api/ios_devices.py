@@ -34,7 +34,7 @@ async def pull_ipa(body: PullIpaRequest):
     pulled_dir = settings.uploads_dir / "pulled_ios"
     try:
         ipa_path = await ios_device_manager.pull_ipa(body.udid, body.bundle_id, pulled_dir)
-    except RuntimeError as e:
+    except Exception as e:
         raise HTTPException(400, str(e))
     return {"ipa_path": str(ipa_path)}
 
@@ -54,7 +54,7 @@ async def pull_and_analyze(body: PullAnalyzeRequest, background_tasks: Backgroun
     pulled_dir = settings.uploads_dir / "pulled_ios"
     try:
         ipa_path = await ios_device_manager.pull_ipa(body.udid, body.bundle_id, pulled_dir)
-    except RuntimeError as e:
+    except Exception as e:
         raise HTTPException(400, str(e))
 
     content = ipa_path.read_bytes()

@@ -2,6 +2,7 @@ import asyncio
 import re
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 from typing import TypedDict
 
@@ -45,6 +46,35 @@ def _resolve(configured: Path, fallback_name: str) -> str | None:
     return found
 
 
+def _resolve_jadx() -> str | None:
+    """
+    Return a runnable jadx path, preferring .bat on Windows.
+
+    The bundled jadx/bin/jadx is a Unix shell script.  On Windows,
+    subprocess can't execute it directly (WinError 193).  jadx also ships
+    jadx.bat in the same directory, which works fine via cmd.exe.
+    """
+    configured = settings.jadx_path          # e.g. tools/jadx/bin/jadx
+    bat = Path(str(configured) + ".bat")     # tools/jadx/bin/jadx.bat
+
+    if sys.platform == "win32":
+        if bat.exists():
+            return str(bat)
+        if configured.exists():
+            return str(configured)           # last resort — may still fail
+    else:
+        if configured.exists():
+            return str(configured)
+
+    # Fall back to PATH — prefer .bat on Windows
+    for name in (["jadx.bat", "jadx"] if sys.platform == "win32" else ["jadx"]):
+        found = shutil.which(name)
+        if found:
+            return found
+
+    return None
+
+
 async def check_java() -> ToolStatus:
     path = shutil.which(settings.java_path) or settings.java_path
     rc, _, stderr = await _run([settings.java_path, "-version"])
@@ -81,7 +111,7 @@ async def check_apktool() -> ToolStatus:
 
 
 async def check_jadx() -> ToolStatus:
-    path = _resolve(settings.jadx_path, "jadx")
+    path = _resolve_jadx()
     if path is None:
         return ToolStatus(
             name="jadx",

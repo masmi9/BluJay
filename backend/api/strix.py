@@ -113,8 +113,30 @@ class ScanStatusResponse(BaseModel):
 # ──────────────────────────────────────────────────────────────────────────
 
 def _strix_installed() -> bool:
-    """Check if the strix CLI is on PATH."""
-    return shutil.which("strix") is not None
+    """
+    Check if a usable strix CLI is available.
+
+    shutil.which() is not sufficient on Windows: it resolves Windows App
+    Execution Aliases (stubs in WindowsApps/) for apps that are *not* installed
+    — they appear on PATH but fail with FileNotFoundError when subprocess tries
+    to run them.  We verify by actually running `strix --version`.
+    """
+    strix_path = shutil.which("strix")
+    if not strix_path:
+        return False
+    # Windows App Execution Aliases live in WindowsApps and are Microsoft Store
+    # stubs; they cannot be run by subprocess.
+    if "WindowsApps" in strix_path or "windowsapps" in strix_path.lower():
+        return False
+    try:
+        result = subprocess.run(
+            ["strix", "--version"],
+            capture_output=True,
+            timeout=8,
+        )
+        return result.returncode == 0
+    except Exception:
+        return False
 
 
 def _docker_running() -> bool:
@@ -315,9 +337,11 @@ async def _run_strix_scan(scan_id: int, request: StartScanRequest):
             await db.commit()
 
         except Exception as e:
-            logger.error("Strix scan failed", scan_id=scan_id, error=str(e))
+            err_msg = str(e) or f"{type(e).__name__} (no message)"
+            logger.error("Strix scan failed", scan_id=scan_id, error=err_msg,
+                         exc_type=type(e).__name__)
             scan.status = "error"
-            scan.error = str(e)
+            scan.error = err_msg
             scan.raw_output = "\n".join(raw_output_lines)
             scan.completed_at = datetime.utcnow()
             await db.commit()

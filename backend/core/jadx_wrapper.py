@@ -1,6 +1,7 @@
 import asyncio
 import shutil
 import subprocess
+import sys
 import threading
 from dataclasses import dataclass
 from pathlib import Path
@@ -21,10 +22,20 @@ class JadxWrapper:
 
     def _resolve_path(self) -> str | None:
         configured = settings.jadx_path
-        if configured.exists():
-            return str(configured)
-        found = shutil.which("jadx")
-        return found
+        bat = Path(str(configured) + ".bat")
+        if sys.platform == "win32":
+            if bat.exists():
+                return str(bat)
+            if configured.exists():
+                return str(configured)
+        else:
+            if configured.exists():
+                return str(configured)
+        for name in (["jadx.bat", "jadx"] if sys.platform == "win32" else ["jadx"]):
+            found = shutil.which(name)
+            if found:
+                return found
+        return None
 
     def available(self) -> bool:
         return self._jadx is not None

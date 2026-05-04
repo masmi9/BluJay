@@ -4,13 +4,47 @@ import { useNavigate } from 'react-router-dom'
 import {
   Terminal, Play, Trash2, ChevronDown, ChevronRight, Loader2,
   AlertCircle, CheckCircle2, XCircle, RefreshCw, Zap, Download,
-  Hammer, ChevronUp, Power
+  Hammer, ChevronUp, Power, Cpu, MemoryStick, Gamepad2, Network,
+  ShieldOff, Link2,
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { agentApi } from '@/api/agent'
 import { useDeviceStore } from '@/store/deviceStore'
 import { AGENT_COMMANDS } from '@/types/agent'
 import type { AgentCommandResult } from '@/types/agent'
+
+// ── Unity C2 command catalogue ─────────────────────────────────────────────
+
+const UNITY_GROUPS = [
+  {
+    label: 'Recon',
+    icon: Cpu,
+    color: 'text-blue-400',
+    cmds: ['unity_detect', 'unity_list_scenes'],
+  },
+  {
+    label: 'Memory',
+    icon: MemoryStick,
+    color: 'text-purple-400',
+    cmds: ['unity_dump_il2cpp', 'unity_scan_memory'],
+  },
+  {
+    label: 'Game State',
+    icon: Gamepad2,
+    color: 'text-yellow-400',
+    cmds: ['unity_read_prefs', 'unity_write_prefs'],
+  },
+  {
+    label: 'Exploit',
+    icon: ShieldOff,
+    color: 'text-red-400',
+    cmds: ['unity_hook_method', 'unity_bypass_ssl', 'unity_exploit_socket', 'unity_exploit_chain'],
+  },
+] as const
+
+const UNITY_CMD_MAP = Object.fromEntries(
+  AGENT_COMMANDS.filter((c) => c.value.startsWith('unity_')).map((c) => [c.value, c])
+)
 
 export default function AgentConsole() {
   const navigate = useNavigate()
@@ -22,6 +56,9 @@ export default function AgentConsole() {
   const [running, setRunning] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<number | null>(null)
+  const [activeTab, setActiveTab] = useState<'standard' | 'unity'>('standard')
+  const [unityPackage, setUnityPackage] = useState('')
+  const [unityArgs, setUnityArgs] = useState<Record<string, string>>({})
   const qc = useQueryClient()
 
   // Setup state
@@ -161,6 +198,21 @@ export default function AgentConsole() {
     }
   }
 
+  const handleUnityRun = async (cmd: string, extraArgs: Record<string, string> = {}) => {
+    if (!serial) return
+    setRunning(true)
+    setError(null)
+    const mergedArgs = { package: unityPackage, ...unityArgs, ...extraArgs }
+    try {
+      await agentApi.run(serial, cmd, mergedArgs)
+      qc.invalidateQueries({ queryKey: ['agent-history', serial] })
+    } catch (e: any) {
+      setError(e?.response?.data?.detail ?? e?.message ?? 'Command failed')
+    } finally {
+      setRunning(false)
+    }
+  }
+
   const clearHistory = async () => {
     if (!serial) return
     await agentApi.clearHistory(serial)
@@ -185,6 +237,7 @@ export default function AgentConsole() {
             <p className="text-xs text-zinc-600">No device connected</p>
           ) : (
             <select
+              aria-label="Select device"
               className="w-full bg-bg-elevated border border-bg-border rounded px-2 py-1.5 text-xs text-zinc-200 mb-3"
               value={serial}
               onChange={(e) => setSerial(e.target.value)}
@@ -369,55 +422,195 @@ export default function AgentConsole() {
             </button>
           </div>
 
-        {/* ── Command Builder ── */}
-        <div className="p-4 border-b border-bg-border">
-          <p className="text-xs font-semibold text-zinc-300 mb-3">Run Command</p>
-
-          <label className="block text-xs text-zinc-500 mb-1">Command</label>
-          <select
-            className="w-full bg-bg-elevated border border-bg-border rounded px-2 py-1.5 text-xs text-zinc-200 mb-2"
-            value={command}
-            onChange={(e) => { setCommand(e.target.value); setArgs({}) }}
-          >
-            {AGENT_COMMANDS.map((c) => (
-              <option key={c.value} value={c.value}>{c.label}</option>
+        {/* ── Command section with tabs ── */}
+        <div className="border-b border-bg-border">
+          {/* Tab bar */}
+          <div className="flex border-b border-bg-border">
+            {[
+              { id: 'standard' as const, label: 'Standard' },
+              { id: 'unity' as const, label: 'Unity C2', badge: true },
+            ].map((t) => (
+              <button
+                key={t.id}
+                onClick={() => setActiveTab(t.id)}
+                className={clsx(
+                  'flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium border-b-2 transition-colors',
+                  activeTab === t.id
+                    ? 'border-accent text-accent'
+                    : 'border-transparent text-zinc-500 hover:text-zinc-300',
+                )}
+              >
+                {t.label}
+                {t.badge && (
+                  <span className="text-[9px] px-1 py-0.5 bg-red-500/20 text-red-400 rounded">C2</span>
+                )}
+              </button>
             ))}
-          </select>
-          <p className="text-xs text-zinc-600 mb-3">{selectedCmd.description}</p>
+          </div>
 
-          {selectedCmd.args.filter((a) => !a.endsWith('?')).map((arg) => (
-            <div key={arg} className="mb-2">
-              <label className="block text-xs text-zinc-500 mb-1">{arg}</label>
-              <input
-                className="w-full bg-bg-elevated border border-bg-border rounded px-2 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-accent font-mono"
-                placeholder={arg}
-                value={args[arg] ?? ''}
-                onChange={(e) => setArgs((p) => ({ ...p, [arg]: e.target.value }))}
-              />
-            </div>
-          ))}
+          {/* Standard tab */}
+          {activeTab === 'standard' && (
+            <div className="p-4 space-y-2">
+              <label className="block text-xs text-zinc-500 mb-1">Command</label>
+              <select
+                aria-label="Select command"
+                className="w-full bg-bg-elevated border border-bg-border rounded px-2 py-1.5 text-xs text-zinc-200 mb-1"
+                value={command}
+                onChange={(e) => { setCommand(e.target.value); setArgs({}) }}
+              >
+                {AGENT_COMMANDS.filter((c) => !c.value.startsWith('unity_')).map((c) => (
+                  <option key={c.value} value={c.value}>{c.label}</option>
+                ))}
+              </select>
+              <p className="text-[10px] text-zinc-600 mb-2">{selectedCmd.description}</p>
 
-          {error && (
-            <div className="flex items-start gap-2 mt-2 p-2 bg-red-500/10 border border-red-500/30 rounded text-xs text-red-400">
-              <AlertCircle size={12} className="mt-0.5 shrink-0" />
-              {error}
+              {selectedCmd.args.filter((a) => !a.endsWith('?')).map((arg) => (
+                <div key={arg}>
+                  <label className="block text-xs text-zinc-500 mb-1">{arg}</label>
+                  <input
+                    className="w-full bg-bg-elevated border border-bg-border rounded px-2 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-accent font-mono"
+                    placeholder={arg}
+                    value={args[arg] ?? ''}
+                    onChange={(e) => setArgs((p) => ({ ...p, [arg]: e.target.value }))}
+                  />
+                </div>
+              ))}
+
+              {error && (
+                <div className="flex items-start gap-2 p-2 bg-red-500/10 border border-red-500/30 rounded text-xs text-red-400">
+                  <AlertCircle size={12} className="mt-0.5 shrink-0" />
+                  {error}
+                </div>
+              )}
+
+              <button
+                onClick={handleRun}
+                disabled={running || !serial || !status?.reachable}
+                className="w-full flex items-center justify-center gap-2 py-2 text-xs font-medium bg-accent/20 text-accent rounded hover:bg-accent/30 disabled:opacity-40 transition-colors"
+                title={!status?.reachable ? 'Agent not reachable — run Install & Forward first' : undefined}
+              >
+                {running ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
+                {running ? 'Running...' : 'Run'}
+              </button>
+
+              {serial && status && !status.reachable && (
+                <p className="text-[10px] text-zinc-600 text-center">
+                  Agent not reachable — install & forward port first
+                </p>
+              )}
             </div>
           )}
 
-          <button
-            onClick={handleRun}
-            disabled={running || !serial || !status?.reachable}
-            className="w-full mt-3 flex items-center justify-center gap-2 py-2 text-xs font-medium bg-accent/20 text-accent rounded hover:bg-accent/30 disabled:opacity-40 transition-colors"
-            title={!status?.reachable ? 'Agent not reachable — run Install & Forward first' : undefined}
-          >
-            {running ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} />}
-            {running ? 'Running...' : 'Run'}
-          </button>
+          {/* Unity C2 tab */}
+          {activeTab === 'unity' && (
+            <div className="p-4 space-y-3">
+              <div className="flex items-center gap-1.5 text-[10px] text-zinc-500">
+                <Cpu size={11} className="text-purple-400" />
+                <span>Unity engine exploitation via MobileMorphAgent</span>
+              </div>
 
-          {serial && status && !status.reachable && (
-            <p className="text-[10px] text-zinc-600 mt-2 text-center">
-              Agent not reachable — install & forward port first
-            </p>
+              {/* Target package */}
+              <div>
+                <label className="block text-[10px] text-zinc-500 mb-1">Target Package</label>
+                <input
+                  className="w-full bg-bg-elevated border border-bg-border rounded px-2 py-1.5 text-xs text-zinc-200 focus:outline-none focus:border-accent font-mono"
+                  placeholder="com.game.unity"
+                  value={unityPackage}
+                  onChange={(e) => setUnityPackage(e.target.value)}
+                />
+              </div>
+
+              {/* Extra args for commands that need them */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[10px] text-zinc-500 mb-1">Class (hook)</label>
+                  <input
+                    className="w-full bg-bg-elevated border border-bg-border rounded px-2 py-1.5 text-[10px] text-zinc-200 focus:outline-none focus:border-accent font-mono"
+                    placeholder="GameManager"
+                    value={unityArgs['class_name'] ?? ''}
+                    onChange={(e) => setUnityArgs((p) => ({ ...p, class_name: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] text-zinc-500 mb-1">Method (hook)</label>
+                  <input
+                    className="w-full bg-bg-elevated border border-bg-border rounded px-2 py-1.5 text-[10px] text-zinc-200 focus:outline-none focus:border-accent font-mono"
+                    placeholder="GetScore"
+                    value={unityArgs['method_name'] ?? ''}
+                    onChange={(e) => setUnityArgs((p) => ({ ...p, method_name: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] text-zinc-500 mb-1">Pref key (write)</label>
+                  <input
+                    className="w-full bg-bg-elevated border border-bg-border rounded px-2 py-1.5 text-[10px] text-zinc-200 focus:outline-none focus:border-accent font-mono"
+                    placeholder="coins"
+                    value={unityArgs['key'] ?? ''}
+                    onChange={(e) => setUnityArgs((p) => ({ ...p, key: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] text-zinc-500 mb-1">Pref value</label>
+                  <input
+                    className="w-full bg-bg-elevated border border-bg-border rounded px-2 py-1.5 text-[10px] text-zinc-200 focus:outline-none focus:border-accent font-mono"
+                    placeholder="99999"
+                    value={unityArgs['value'] ?? ''}
+                    onChange={(e) => setUnityArgs((p) => ({ ...p, value: e.target.value }))}
+                  />
+                </div>
+              </div>
+
+              {error && (
+                <div className="flex items-start gap-2 p-2 bg-red-500/10 border border-red-500/30 rounded text-xs text-red-400">
+                  <AlertCircle size={12} className="mt-0.5 shrink-0" />
+                  {error}
+                </div>
+              )}
+
+              {!status?.reachable && serial && (
+                <p className="text-[10px] text-zinc-600 text-center">
+                  Agent not reachable — install & forward port first
+                </p>
+              )}
+
+              {/* Command groups */}
+              {UNITY_GROUPS.map((group) => {
+                const Icon = group.icon
+                return (
+                  <div key={group.label}>
+                    <div className={clsx('flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wider mb-1.5', group.color)}>
+                      <Icon size={10} />
+                      {group.label}
+                    </div>
+                    <div className="grid grid-cols-1 gap-1">
+                      {group.cmds.map((cmdVal) => {
+                        const meta = UNITY_CMD_MAP[cmdVal]
+                        if (!meta) return null
+                        return (
+                          <button
+                            key={cmdVal}
+                            onClick={() => handleUnityRun(cmdVal)}
+                            disabled={running || !serial || !status?.reachable || !unityPackage}
+                            title={!unityPackage ? 'Enter target package first' : meta.description}
+                            className="flex items-center gap-2 px-2.5 py-2 bg-bg-elevated border border-bg-border rounded hover:border-zinc-500 hover:bg-bg-base disabled:opacity-40 transition-colors text-left group"
+                          >
+                            {running ? (
+                              <Loader2 size={11} className="text-zinc-500 shrink-0 animate-spin" />
+                            ) : (
+                              <Play size={11} className="text-zinc-500 group-hover:text-accent shrink-0 transition-colors" />
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[11px] font-medium text-zinc-300 truncate">{meta.label.replace('Unity: ', '')}</p>
+                              <p className="text-[9px] text-zinc-600 truncate">{meta.description.split(' — ')[0].split(',')[0]}</p>
+                            </div>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
           )}
         </div>
 

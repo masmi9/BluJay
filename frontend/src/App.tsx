@@ -16,9 +16,11 @@ import WebViewPage from '@/pages/WebViewPage'
 import RiskPage from '@/pages/RiskPage'
 import DiffPage from '@/pages/DiffPage'
 import CampaignPage from '@/pages/CampaignPage'
+import ChecklistPage from '@/pages/ChecklistPage'
 import ApiScannerPage from '@/pages/ApiScannerPage'
 import DecodePage from '@/pages/DecodePage'
 import PciTestPage from '@/pages/PciTestPage'
+import CTFPage from '@/pages/CTFPage'
 
 export default function App() {
   return (
@@ -43,9 +45,11 @@ export default function App() {
               <Route path="/risk/:id" element={<RiskPage />} />
               <Route path="/diff" element={<DiffPage />} />
               <Route path="/campaigns" element={<CampaignPage />} />
+              <Route path="/checklist" element={<ChecklistPage />} />
               <Route path="/api-scanner" element={<ApiScannerPage />} />
               <Route path="/decode" element={<DecodePage />} />
               <Route path="/pci" element={<PciTestPage />} />
+              <Route path="/ctf" element={<CTFPage />} />
               {/* Legacy redirects */}
               <Route path="/scanner" element={<Navigate to="/api-scanner" replace />} />
               <Route path="/api-testing" element={<Navigate to="/api-scanner" replace />} />
