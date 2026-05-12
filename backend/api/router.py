@@ -34,6 +34,11 @@ from api.graphql_test import router as graphql_test_router
 from api.recon import router as recon_router
 from api.pci import router as pci_router
 from api.ctf import router as ctf_router
+from api.repeater import router as repeater_router
+from api.auth_tester import router as auth_tester_router
+from api.vuln_intel import router as vuln_intel_router
+from api.cloud_tester import router as cloud_tester_router
+from api.protocol_tester import router as protocol_tester_router
 
 api_router = APIRouter()
 api_router.include_router(analysis_router, prefix="/analyses", tags=["analysis"])
@@ -70,6 +75,11 @@ api_router.include_router(graphql_test_router, prefix="/graphql-test", tags=["gr
 api_router.include_router(recon_router, prefix="/recon", tags=["recon"])
 api_router.include_router(pci_router, prefix="/pci", tags=["pci"])
 api_router.include_router(ctf_router, prefix="/ctf", tags=["ctf"])
+api_router.include_router(repeater_router, prefix="/repeater", tags=["repeater"])
+api_router.include_router(auth_tester_router, prefix="/auth", tags=["auth-tester"])
+api_router.include_router(vuln_intel_router, prefix="/vuln", tags=["vuln-intel"])
+api_router.include_router(cloud_tester_router, prefix="/cloud", tags=["cloud-tester"])
+api_router.include_router(protocol_tester_router, prefix="/protocol", tags=["protocol-tester"])
 
 # Singletons initialised lazily (so imports don't fail before lifespan runs)
 _proxy_manager = None

@@ -48,6 +48,7 @@ Endpoints:
 import asyncio
 import json
 import os
+import platform
 import re
 import shutil
 import subprocess
@@ -67,16 +68,36 @@ from models.agent import StrixScan
 logger = structlog.get_logger()
 router = APIRouter()
 
-# ── Where Strix writes its run output ──────────────────────────────────────
-# Strix saves results to strix_runs/<run_name>/ relative to cwd.
-# We pin the cwd to the project root so the path is predictable.
-STRIX_RUNS_DIR = Path.home() / "strix_runs"
-
 # ── Default LLM for Strix ──────────────────────────────────────────────────
-# Uses metatron-qwen via Ollama by default (fully local, no API key).
-# Override with any LiteLLM-compatible model string.
 DEFAULT_STRIX_LLM = "ollama/metatron-qwen"
 DEFAULT_OLLAMA_BASE = "http://localhost:11434"
+
+_ON_WINDOWS = platform.system() == "Windows"
+
+
+def _wsl_runs_dir() -> Path:
+    """
+    On Windows, Strix runs inside WSL and writes strix_runs to the WSL home.
+    Convert that to a Windows-accessible path via wslpath.
+    Falls back to the Windows home if wslpath fails.
+    """
+    try:
+        result = subprocess.run(
+            ["wsl", "wslpath", "-m", "~/strix_runs"],
+            capture_output=True, text=True, timeout=5,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return Path(result.stdout.strip())
+    except Exception:
+        pass
+    return Path.home() / "strix_runs"
+
+
+def _strix_runs_dir() -> Path:
+    """Return the directory where Strix writes run output, platform-aware."""
+    if _ON_WINDOWS:
+        return _wsl_runs_dir()
+    return Path.home() / "strix_runs"
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -116,16 +137,24 @@ def _strix_installed() -> bool:
     """
     Check if a usable strix CLI is available.
 
-    shutil.which() is not sufficient on Windows: it resolves Windows App
-    Execution Aliases (stubs in WindowsApps/) for apps that are *not* installed
-    — they appear on PATH but fail with FileNotFoundError when subprocess tries
-    to run them.  We verify by actually running `strix --version`.
+    On Windows, Strix has no native installer — we probe for it inside WSL.
+    On Linux/WSL, shutil.which() isn't sufficient because Windows App Execution
+    Aliases appear on PATH but fail when subprocess actually tries to run them.
     """
+    if _ON_WINDOWS:
+        try:
+            result = subprocess.run(
+                ["wsl", "strix", "--version"],
+                capture_output=True,
+                timeout=10,
+            )
+            return result.returncode == 0
+        except Exception:
+            return False
+
     strix_path = shutil.which("strix")
     if not strix_path:
         return False
-    # Windows App Execution Aliases live in WindowsApps and are Microsoft Store
-    # stubs; they cannot be run by subprocess.
     if "WindowsApps" in strix_path or "windowsapps" in strix_path.lower():
         return False
     try:
@@ -161,7 +190,7 @@ def _parse_strix_run_dir(run_name: str) -> dict:
       - summary.md or report.md       (human-readable report)
     Returns a dict with parsed findings.
     """
-    run_dir = STRIX_RUNS_DIR / run_name
+    run_dir = _strix_runs_dir() / run_name
     if not run_dir.exists():
         return {"error": f"Run directory not found: {run_dir}", "findings": [], "vuln_count": 0}
 
@@ -233,26 +262,48 @@ async def _run_strix_scan(scan_id: int, request: StartScanRequest):
         if not scan:
             return
 
-        # Build environment
-        env = os.environ.copy()
-        env["STRIX_LLM"] = request.llm_model
-        env["STRIX_TELEMETRY"] = "0"  # no phone-home during BluJay-initiated scans
+        # Build environment and command — WSL bridge on Windows
+        if _ON_WINDOWS:
+            # On Windows, Strix runs inside WSL. Pass env vars inline via
+            # `wsl env VAR=VAL ... strix` so they propagate into the Linux process.
+            api_key = request.llm_api_key or ("ollama" if "ollama" in request.llm_model.lower() else "")
+            wsl_env = [
+                f"STRIX_LLM={request.llm_model}",
+                "STRIX_TELEMETRY=0",
+            ]
+            if api_key:
+                wsl_env.append(f"LLM_API_KEY={api_key}")
+            if not request.llm_api_key and "ollama" in request.llm_model.lower():
+                wsl_env.append(f"LLM_API_BASE={request.ollama_base}")
 
-        if request.llm_api_key:
-            env["LLM_API_KEY"] = request.llm_api_key
-        elif "ollama" in request.llm_model.lower():
-            env["LLM_API_BASE"] = request.ollama_base
-            env["LLM_API_KEY"] = "ollama"  # litellm requires a non-empty key
+            strix_args = [
+                "strix", "--non-interactive",
+                "--target", request.target,
+                "--scan-mode", request.scan_mode,
+            ]
+            if request.instruction:
+                strix_args += ["--instruction", request.instruction]
 
-        # Build command
-        cmd = [
-            "strix",
-            "--non-interactive",
-            "--target", request.target,
-            "--scan-mode", request.scan_mode,
-        ]
-        if request.instruction:
-            cmd += ["--instruction", request.instruction]
+            cmd = ["wsl", "--cd", "~", "env"] + wsl_env + strix_args
+            env = None  # env is inlined into the wsl command
+        else:
+            env = os.environ.copy()
+            env["STRIX_LLM"] = request.llm_model
+            env["STRIX_TELEMETRY"] = "0"
+
+            if request.llm_api_key:
+                env["LLM_API_KEY"] = request.llm_api_key
+            elif "ollama" in request.llm_model.lower():
+                env["LLM_API_BASE"] = request.ollama_base
+                env["LLM_API_KEY"] = "ollama"
+
+            cmd = [
+                "strix", "--non-interactive",
+                "--target", request.target,
+                "--scan-mode", request.scan_mode,
+            ]
+            if request.instruction:
+                cmd += ["--instruction", request.instruction]
 
         # Update record to running
         scan.status = "running"
@@ -268,8 +319,8 @@ async def _run_strix_scan(scan_id: int, request: StartScanRequest):
                 *cmd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT,
-                env=env,
-                cwd=str(Path.home()),
+                env=env,  # None on Windows (env inlined into wsl env cmd)
+                cwd=None if _ON_WINDOWS else str(Path.home()),
             )
 
             # Store PID for cancellation
@@ -395,13 +446,21 @@ async def strix_status():
     strix_ok = _strix_installed()
     docker_ok = _docker_running()
 
+    if _ON_WINDOWS:
+        strix_hint = "Install Strix inside WSL: wsl bash -c \"curl -sSL https://strix.ai/install | bash && source ~/.bashrc\""
+        docker_hint = "Start Docker Desktop (ensure 'Use the WSL 2 based engine' is enabled in Settings)"
+    else:
+        strix_hint = "Install Strix: curl -sSL https://strix.ai/install | bash && source ~/.bashrc"
+        docker_hint = "Start Docker: sudo systemctl start docker"
+
     return {
         "strix_installed": strix_ok,
         "docker_running": docker_ok,
         "ready": strix_ok and docker_ok,
+        "platform": "windows-wsl" if _ON_WINDOWS else "linux",
         "hints": [
-            *([] if strix_ok else ["Install Strix: curl -sSL https://strix.ai/install | bash"]),
-            *([] if docker_ok else ["Start Docker Desktop or run: sudo systemctl start docker"]),
+            *([] if strix_ok else [strix_hint]),
+            *([] if docker_ok else [docker_hint]),
         ],
     }
 
@@ -549,9 +608,12 @@ async def cancel_scan(scan_id: int, db: AsyncSession = Depends(get_db)):
     if scan.pid:
         try:
             import signal
-            os.kill(scan.pid, signal.SIGTERM)
-        except ProcessLookupError:
-            pass  # Already finished
+            # On Windows, os.kill with SIGTERM calls TerminateProcess (force-kill).
+            # On Linux, it sends SIGTERM gracefully. Both are correct here.
+            sig = signal.SIGTERM if not _ON_WINDOWS else signal.CTRL_BREAK_EVENT
+            os.kill(scan.pid, sig)
+        except (ProcessLookupError, OSError):
+            pass  # Already finished or PID no longer valid
 
     scan.status = "cancelled"
     scan.completed_at = datetime.utcnow()

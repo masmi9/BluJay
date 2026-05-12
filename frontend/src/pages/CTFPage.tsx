@@ -401,6 +401,7 @@ function ScanRow({ scan, isSelected, onSelect }: {
           <button
             onClick={(e) => { e.stopPropagation(); del.mutate() }}
             disabled={del.isPending}
+            aria-label={`Delete scan for ${scan.target}`}
             className="shrink-0 text-zinc-600 hover:text-red-400 disabled:opacity-40 transition-colors"
           >
             <Trash2 size={11} />
@@ -567,8 +568,8 @@ export default function CTFPage() {
           {advanced && (
             <div className="space-y-2 border-t border-bg-border pt-2">
               <div>
-                <label className="block text-[10px] text-zinc-500 mb-1">Nmap Speed (-T{speed})</label>
-                <input type="range" min={1} max={5} step={1} value={speed}
+                <label htmlFor="nmap-speed" className="block text-[10px] text-zinc-500 mb-1">Nmap Speed (-T{speed})</label>
+                <input id="nmap-speed" type="range" min={1} max={5} step={1} value={speed}
                   onChange={(e) => setSpeed(Number(e.target.value))}
                   className="w-full accent-accent" />
                 <div className="flex justify-between text-[9px] text-zinc-600 mt-0.5">

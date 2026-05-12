@@ -7,20 +7,25 @@
 ╚═════╝ ╚══════╝ ╚═════╝  ╚═════╝ ╚═╝  ╚═╝   ╚═╝   
 ```
 
-A mobile application security analysis platform for Android and iOS. BluJay combines static analysis, dynamic instrumentation, traffic interception, active/passive scanning, race condition testing, OWASP MASVS compliance scanning, autonomous backend pentesting, APK repackaging, passive recon, WebSocket/GraphQL testing, PCI DSS testing, and local AI-powered triage into a single unified interface.
+A mobile and web application security platform for intermediate–senior AppSec engineers. BluJay combines static analysis, dynamic instrumentation, traffic interception, a standalone Burp-style repeater, auth/session testing, vulnerability intelligence, cloud security testing, protocol testing, race condition testing, OWASP MASVS compliance scanning, autonomous backend pentesting, APK repackaging, passive recon, WebSocket/GraphQL testing, PCI DSS testing, CTF automation, and local AI-powered triage into a single unified interface.
 
 ## Navigation
 
-The sidebar is organized into consolidated modules:
-
 | Tab | Contains |
 |-----|---------|
-| **Proxy** | Traffic capture, Repeater (Enhanced/Raw), Race Conditions |
+| **Proxy** | Traffic capture, Send to Repeater |
+| **Repeater** | Standalone request editor (Enhanced/Raw), Race Conditions, Diff mode, Match & Replace, History |
 | **API + Scanner** | Scanner, API Testing, Brute Force, WebSocket, GraphQL, Recon, Repackage, Strix Pentest |
+| **CTF Mode** | Automated recon pipeline (nmap → scope → Strix), persistent scan history |
+| **Auth & Session Tester** | JWT decode/forge/verify, OAuth/OIDC audit, session cookie analysis, SAML decode |
+| **Vulnerability Intelligence** | CVE search (NVD), version-match scanning, Nuclei scanner, ExploitDB |
+| **Cloud Tester** | IMDS probing, SSRF payloads, bucket enumeration, credential scanning/validation |
+| **Protocol Tester** | TLS/SSL analysis, subdomain enumeration (crt.sh + DNS), LDAP, gRPC |
+| **AI Triage** | Multi-source findings triage via Ollama (metatron-qwen), session reports |
 | **Frida** | Dynamic instrumentation |
 | **OWASP Scanner** | MASVS compliance scanning |
+| **PCI DSS Scanner** | Interactive PCI DSS compliance test flow |
 | **Agent Console** | AI-assisted Android analysis |
-| **Decode** | TLS Audit, JWT Testing, AI Triage |
 | **Diff / Change Detection** | APK/IPA version comparison |
 | **Testing Checklist** | OWASP MASVS (iOS & Android) + WSTG progress tracker |
 | **Settings** | Tool paths, proxy port, log level |
@@ -35,6 +40,107 @@ The sidebar is organized into consolidated modules:
 - **iOS IPA Dump** — Pull decrypted IPAs from jailbroken devices using Frida + SSH/SFTP (three-phase: Frida locates the bundle and writes the decrypted segment patch to `/tmp` on-device, SFTP downloads the full `.app` bundle, host applies the patch and packages a valid IPA)
 - **iOS Syslog** — Live syslog streaming from connected iOS devices via libimobiledevice
 
+### Repeater
+Standalone Burp-style request editor at `/repeater`:
+
+- **Form mode** — Method selector, URL bar, headers editor, body editor with content-type picker, follow-redirects / verify-SSL / timeout options
+- **Raw mode** — Edit the full HTTP request as text (Burp-style); syncs bidirectionally with form mode
+- **Raw view tab** — Read-only render of the outgoing HTTP request for copy-paste
+- **Match & Replace rules** — Regex find/replace applied to `url`, `headers`, `body`, or `all` before each send
+- **Response viewer** — Status, elapsed time, size, redirect count, body/headers tabs, copy button
+- **Diff mode** — Pin any response as baseline; click Diff to see line-by-line delta against the next response
+- **Race Conditions** — Switch to the Race Conditions tab, set a thread count (1–50), fire all requests simultaneously. Anomalous responses (different status or body size) are highlighted — the key indicator of a race condition window
+- **History sidebar** — All sent requests are saved automatically; reload any entry to continue editing
+- **Send to Repeater** — Click the button in Proxy's flow detail panel to pre-populate Repeater with a captured flow (method, URL, headers, body passed via sessionStorage)
+
+### Auth & Session Tester
+Full authentication and session security testing at `/auth-tester`:
+
+**JWT tab**
+- Decode any JWT (header, payload, signature validation)
+- Detect vulnerabilities: weak `alg`, missing `exp`, `kid` SQLi/path-traversal, `jku`/`x5u` presence
+- Forge attacks: `alg:none` (strip signature), RS256→HS256 key confusion, `kid` SQL injection, `kid` path traversal, custom claim editing
+- Verify JWT against a provided public key or HMAC secret
+
+**OAuth/OIDC tab**
+- Audit OAuth 2.0 flows for: state CSRF, PKCE enforcement, implicit flow usage, redirect_uri whitelist, nonce replay, token leakage in referrer
+
+**Session & Cookie tab**
+- Analyze `Set-Cookie` headers for `HttpOnly`, `Secure`, `SameSite` flags, `__Host-`/`__Secure-` prefix compliance
+- Shannon entropy scoring on session token values to detect predictable IDs
+
+**SAML tab**
+- Decode and inspect SAML assertions (base64 + zlib inflate)
+- Detect unsigned assertions, wrapping attack vectors
+
+### Vulnerability Intelligence
+CVE and exploit research at `/vuln-intel`:
+
+**CVE Search tab**
+- Keyword search against NVD API v2 with severity, score, CWE, CPE, and CVSS metrics displayed
+- Version-match mode: specify product + version, checks all known CPEs — returns CVEs affecting that exact release
+- 24-hour MD5-keyed cache; respects NVD rate limits (0.7s between requests); `NVD_API_KEY` env var for 50 req/30s tier
+
+**Nuclei Scanner tab**
+- Launch Nuclei scans against a target URL with configurable template tags, severity filter, and rate limit
+- Results parsed from JSONL output and streamed to the UI (background task with poll endpoint)
+- Cross-platform binary detection (Windows/Mac/Linux + common install paths)
+
+**ExploitDB tab**
+- Search ExploitDB via `searchsploit --json` with automatic web API fallback
+- Results show exploit ID, title, type, platform, and link to exploit-db.com
+
+### Cloud Tester
+Cloud security testing at `/cloud-tester`:
+
+**IMDS / SSRF tab**
+- Probe AWS, GCP, Azure, and DigitalOcean IMDS endpoints directly or via SSRF callback URL
+- 6 SSRF payload variants per provider: direct IP, octal encoding (`0177.0.0.01`), nip.io DNS rebind, IPv6, percent-encoded, short URL
+- Credential fields extracted and redacted in results (shows first 4 + last 4 chars)
+
+**Bucket Audit tab**
+- Unauthenticated enumeration of S3 (ListObjects), GCS (list), and Azure Blob Storage containers
+- Tests for public read and anonymous write access
+- Specify provider, bucket name, and region
+
+**Credential Scanner tab**
+- Scan arbitrary text (APK strings, config files, env dumps) for 6 credential pattern families: AWS Access Key, AWS Secret, GCP Service Account JSON, Azure Connection String, Azure SAS Token, generic API key patterns
+- Validate AWS credentials live against STS `GetCallerIdentity` (requires boto3)
+- All found secrets redacted in display output
+
+### Protocol Tester
+Low-level protocol security testing at `/protocol-tester`:
+
+**TLS/SSL tab**
+- Probe supported TLS versions: SSLv2, SSLv3, TLS 1.0, 1.1, 1.2, 1.3
+- Parse certificate: subject, issuer, SANs, validity window, self-signed detection
+- Classify known vulnerabilities: BEAST (CBC + TLS ≤1.0), POODLE (SSLv3), LOGJAM (TLS 1.0/1.1), DROWN (SSLv2/SSLv3)
+
+**Subdomains tab**
+- crt.sh certificate transparency lookup + async DNS A/AAAA resolution (50 concurrent)
+- Brute-force DNS check against 80 common subdomain prefixes
+- Deduplicated results with IP addresses and active/inactive status
+
+**LDAP tab**
+- Anonymous bind → rootDSE probe (server info, supported controls, naming contexts)
+- User enumeration via `(objectClass=person)` search
+- Password policy extraction
+- Authenticated bind with custom DN/password
+
+**gRPC tab**
+- Server reflection (lists available services + methods + proto descriptor)
+- Send unary requests with JSON payload to any reflected method
+- Fuzz suite: 15 payloads covering empty string, null byte, oversized string (8192 chars), SQL injection, NoSQL, path traversal, SSTI (`{{7*7}}`), format string, unicode BiDi, oversized int, negative int, float overflow, null JSON, array, nested object
+
+### CTF Mode
+Automated recon pipeline at `/ctf`:
+
+- Start a scan with just a target hostname/IP — BluJay runs nmap → scope analysis → Strix pentest agent in sequence
+- **Persistent scan history** backed by `backend/data/ctf_scans.json` (survives server restarts)
+- Scan rows show: open ports, Strix finding count, current phase, time ago, and delete button
+- Clear-all button (blocked while any scan is running)
+- Unity C2 integration and MobileMorphAgent capabilities for post-exploitation simulation
+
 ### Testing Checklist
 Track progress across OWASP MASVS and WSTG test cases within a single engagement:
 
@@ -42,20 +148,17 @@ Track progress across OWASP MASVS and WSTG test cases within a single engagement
 - **Web tab** — OWASP WSTG v4.2 test cases organized by section (INFO, CONFIG, AUTHN, AUTHZ, SESS, INPUT, ERR, CRYPT, BUSLOGIC, CLIENT, API).
 - Status cycle: `Not Started → In Progress → Pass → Fail` (click to cycle, per test case)
 - Per-category progress bars and an overall summary bar across all test cases
-- Persisted in browser localStorage per platform (`blujay_checklist_v1_mobile_ios`, `blujay_checklist_v1_mobile_android`, `blujay_checklist_v1_web`)
+- Persisted in browser localStorage per platform
 
 ### Network & API
 - **Scanner (Passive)** — Runs automatically on every proxied flow. Checks for missing security headers, insecure cookies, reflected input, sensitive data exposure, info disclosure, and CORS misconfigurations
-- **Scanner (Active)** — Sends crafted payloads against target URLs or proxy flows to detect reflected XSS, SQL injection (error-based), open redirect, path traversal, and SSRF. URLs without query parameters are automatically seeded with common parameter names
-- **Race Conditions** — HTTP/2 single-packet attack engine built into the Repeater. Switch to the Race Conditions sub-tab, set a thread count (1–50), and fire all requests simultaneously. Anomalous responses (different status or body size) are highlighted red — the key indicator of a race condition window
-- **TLS Audit** — Validate certificate pinning and TLS configuration
-- **JWT Testing** — Decode, forge, and test JWT tokens from intercepted traffic
+- **Scanner (Active)** — Sends crafted payloads against target URLs or proxy flows to detect reflected XSS, SQL injection (error-based), open redirect, path traversal, and SSRF
 - **API Testing** — Active API security test suite for IDOR sweeps, auth stripping, token replay, and cross-user authorization checks
 - **Brute Force** — Credential stuffing and rate-limit testing against login endpoints
-- **WebSocket Testing** — Connect to WS/WSS endpoints, probe with injection payloads, detect unauthenticated access, XSS reflection, prototype pollution, and JSON-RPC exposure. Auth-strip test included.
-- **GraphQL Testing** — Introspection detection, batching abuse, alias overload (DoS), field suggestion leakage, injection, and unauthenticated mutation detection.
-- **Recon** — Passive subdomain enumeration via certificate transparency (crt.sh) + DNS resolution + cloud storage bucket discovery (S3, GCS, Azure Blob). Derives bucket name candidates from APK package name. Feed results directly into Strix.
-- **Strix Pentest Agent** — Autonomous AI-driven pentesting of backend targets (APIs, servers) discovered during mobile analysis. Runs multi-agent recon → exploit → PoC validation in a Docker sandbox. Findings are proof-of-concept validated before being reported.
+- **WebSocket Testing** — Connect to WS/WSS endpoints, probe with injection payloads, detect unauthenticated access, XSS reflection, prototype pollution, and JSON-RPC exposure
+- **GraphQL Testing** — Introspection detection, batching abuse, alias overload (DoS), field suggestion leakage, injection, and unauthenticated mutation detection
+- **Recon** — Passive subdomain enumeration via certificate transparency (crt.sh) + DNS resolution + cloud storage bucket discovery (S3, GCS, Azure Blob)
+- **Strix Pentest Agent** — Autonomous AI-driven pentesting of backend targets. Runs multi-agent recon → exploit → PoC validation in a Docker sandbox
 
 ### PCI DSS Testing
 Interactive PCI DSS compliance test flow from the **PCI Testing** tab:
@@ -78,28 +181,23 @@ The patched APK is re-signed with a generated debug keystore (`blujay-debug.keys
 
 ### Static Analysis Improvements
 - **iOS Risk Scoring** — Calibrated risk scorer (denominator 1000) prevents score inflation on large commercial binaries
-- **iOS Finding Enrichment** — All iOS findings carry `impact`, `attack_path`, and `evidence` fields. Rule IDs cover ATS misconfigurations, binary secrets, entitlement abuse, insecure frameworks, and sensitive permissions
-- **Binary String Deduplication** — Scanner deduplicates findings per pattern (max 3 examples each) so a single binary with hundreds of weak-crypto references doesn't skew the risk score
+- **iOS Finding Enrichment** — All iOS findings carry `impact`, `attack_path`, and `evidence` fields
+- **Binary String Deduplication** — Scanner deduplicates findings per pattern (max 3 examples each)
 - **Deep Secrets Scanner** — 55+ patterns covering AWS, GCP, Azure, GitHub, GitLab, Stripe, Square, PayPal, Twilio, SendGrid, Mailgun, Slack, Auth0, Okta, Shopify, HubSpot, Docker Hub, npm, and more
 
 ### AI & Reporting
 - **AI Triage** — Local AI-powered vulnerability analysis using metatron-qwen (fine-tuned Qwen via Ollama). No cloud, no API keys. Accepts output from any scan module and returns severity classification, OWASP MASVS mapping, and remediation steps. Includes consolidated session reports that correlate findings across all modules and identify attack chains.
 - **Agent Console** — AI-assisted Android agent for manifest analysis, permission auditing, exported component enumeration, and IPC analysis
 - **Risk Scoring** — Unified risk score across all findings for a session
-- **HTML Report Export** — Self-contained HTML report (inline CSS, dark theme) covering static findings, OWASP results, and network scanner findings. Download from any completed analysis.
-- **SARIF Export** — SARIF 2.1.0 output compatible with GitHub Code Scanning, GitLab SAST, and any CI/CD pipeline that supports the standard. Export button on every analysis page.
+- **HTML Report Export** — Self-contained HTML report (inline CSS, dark theme) covering static findings, OWASP results, and network scanner findings
+- **SARIF Export** — SARIF 2.1.0 output compatible with GitHub Code Scanning, GitLab SAST, and any CI/CD pipeline that supports the standard
 
 ### CI/CD Headless Mode
 Run BluJay scans without the frontend from any pipeline:
 
 ```bash
-# Install requests (only external dep for the CLI)
 pip install requests
-
-# Scan and export SARIF (for GitHub Actions / GitLab CI)
 python backend/cli.py scan --apk app.apk --format sarif --output results.sarif
-
-# Fail the build if any high/critical findings are present
 python backend/cli.py scan --apk app.apk --fail-on high
 ```
 
@@ -118,123 +216,97 @@ Add to **GitHub Actions**:
 - **WebView Inspector** — Detect and audit WebView configurations in running apps
 - **Screenshot Capture** — Capture device screenshots during dynamic sessions
 
-## How API Testing Works
-
-The API Testing module is designed around the idea that the proxy is doing the reconnaissance — you don't need to manually enter URLs.
+## How the AppSec Workflow Fits Together
 
 ```
-Proxy Session (traffic capture)
-        │
-        ▼
-Build from Proxy Flows  →  Extracts auth tokens, resource IDs, URL patterns
-        │
-        ▼
-Suggested Tests  →  IDOR Sweep, Auth Strip, Token Replay, Cross-User Auth
-        │
-        ▼
-Run Test  →  WebSocket streams live results back to the UI
-        │
-        ▼
-Export vulnerable findings  →  Saved to Static Findings (same as OWASP results)
+Mobile App  ──►  Static Analysis → secrets, perms, components, risk score
+     │
+     ▼
+Proxy (traffic capture)
+     │
+     ├──► Send to Repeater  →  edit, replay, diff, race
+     │
+     ├──► Send to Scanner   →  active XSS/SQLi/SSRF/redirect checks
+     │
+     └──► API Testing        →  IDOR, auth strip, token replay, cross-user auth
+     │
+     ▼
+Auth & Session Tester  →  JWT forge/verify, OAuth audit, cookie flags, SAML
+     │
+     ▼
+Protocol Tester        →  TLS version probing, subdomain enum, LDAP, gRPC fuzz
+     │
+     ▼
+Cloud Tester           →  IMDS probe, SSRF payloads, bucket ACL, cred scan
+     │
+     ▼
+Vuln Intelligence      →  CVE/NVD match, Nuclei scan, ExploitDB lookup
+     │
+     ▼
+Strix Pentest Agent    →  autonomous exploit validation in Docker sandbox
+     │
+     ▼
+AI Triage              →  severity, OWASP mapping, remediation, session report
 ```
-
-### Test Types
-
-| Type | What it does |
-|------|-------------|
-| **IDOR Sweep** | Takes an endpoint with a resource ID in the URL/params, replays with 25 foreign IDs, flags responses that return data |
-| **Auth Strip** | Sends the request three ways: with original auth, without any auth header, and with a mangled token. Flags if no-auth or mangled returns data |
-| **Token Replay** | Captures a valid token, pauses and waits for you to log out of the app, then replays the token — detects missing server-side session invalidation |
-| **Cross-User Auth** | With two or more captured auth contexts, swaps Account B's token on Account A's resource — detects BOLA (Broken Object Level Authorization) |
-
-### Dynamic Activation
-
-Navigate to `/api-testing?session=N` to link the module to an active proxy session. The left panel shows a green "Session #N active" indicator. When you click **Build from Proxy Flows**, the backend:
-
-1. Scans all captured proxy flows for that session
-2. Extracts auth headers (`Authorization`, `X-Auth-Token`, session cookies, etc.)
-3. Normalizes URL patterns (digits → `{id}`)
-4. Extracts ID-bearing parameters (Snowflake IDs, `user_id`, `object_id`, etc.)
-5. Returns suggested tests with pre-filled URLs and headers
-
-### Fuzzer Tab
-
-The **Fuzzer** tab inside API Testing is the full API fuzzer — enter a session ID or analysis ID, select attack types, and start a fuzz job. Results stream live and are stored alongside your test suite history.
-
-## How Strix and AI Triage Work Together
-
-```
-Static Analysis / Proxy Session
-        │
-        ▼
-Extract backend URL (hardcoded in APK strings, captured in proxy traffic)
-        │
-        ▼
-Strix Pentest Agent  ──►  Autonomous exploit agents in Docker sandbox
-        │                  Recon → exploit → PoC validation
-        ▼
-AI Triage → Analyze      Paste Strix findings for severity + remediation
-AI Triage → Session Report  Consolidate all module findings into one report
-```
-
-The **auto-triage** option on the Strix page feeds findings directly into metatron-qwen after a scan completes — no manual copy-paste required.
 
 ## Monorepo Structure
 
 ```
 BluJay/
 ├── backend/
-│   ├── api/              # FastAPI routers — one file per feature module (35 total)
+│   ├── api/              # FastAPI routers — one file per feature module (40 total)
 │   │   ├── analysis.py, proxy.py, frida.py, owasp.py
 │   │   ├── strix.py, ollama.py, scanner.py, api_testing.py
 │   │   ├── repackage.py, recon.py, race.py, brute_force.py
-│   │   ├── ws_test.py, graphql_test.py, tls_audit.py, jwt_test.py
-│   │   ├── ios_devices.py, adb.py, pci.py, report.py, ...
-│   │   └── router.py     # registers all routers
-│   ├── core/             # Business logic and tool wrappers (52 modules)
-│   │   ├── proxy_manager.py, proxy_addon.py
-│   │   ├── apk_analyzer.py, ipa_analyzer.py
-│   │   ├── frida_manager.py, frida_dump.py
-│   │   ├── passive_scanner.py, active_scanner.py, secret_scanner.py
-│   │   ├── repackage_engine.py, recon_engine.py, race_engine.py
-│   │   ├── api_fuzzer.py, api_test_engine.py
-│   │   ├── pci_*.py      # PCI DSS testing modules
-│   │   ├── jadx_wrapper.py, apktool_wrapper.py
-│   │   ├── tool_detector.py, ios_device_manager.py
-│   │   └── risk_scorer.py, finding_enricher.py, ...
+│   │   ├── ws_test.py, graphql_test.py, pci.py, report.py
+│   │   ├── repeater.py       # Standalone Burp-style HTTP repeater + history
+│   │   ├── auth_tester.py    # JWT, OAuth/OIDC, session/cookie, SAML
+│   │   ├── vuln_intel.py     # CVE/NVD, Nuclei, ExploitDB
+│   │   ├── cloud_tester.py   # IMDS, SSRF, bucket, credential scan/validate
+│   │   ├── protocol_tester.py # TLS, subdomain enum, LDAP, gRPC
+│   │   └── router.py         # registers all routers
+│   ├── core/             # Business logic and tool wrappers
 │   ├── models/           # SQLAlchemy ORM models
 │   ├── schemas/          # Pydantic request/response schemas
 │   ├── migrations/       # Alembic database migrations
 │   ├── frida_scripts/    # Bundled Frida instrumentation scripts
 │   ├── wordlists/        # Security testing wordlists
-│   ├── config.py         # Pydantic-settings configuration
+│   ├── data/             # Runtime JSON persistence (CTF scans, repeater history, vuln cache)
+│   ├── config.py
 │   ├── requirements.txt
-│   └── run.py            # Uvicorn entry point
+│   └── run.py
 ├── frontend/
 │   ├── src/
-│   │   ├── pages/        # One page component per feature (30 total)
+│   │   ├── pages/        # One page component per feature (35 total)
 │   │   │   ├── Dashboard.tsx, StaticAnalysis.tsx, DynamicAnalysis.tsx
 │   │   │   ├── ProxyPage.tsx, ScannerPage.tsx, ApiScannerPage.tsx
-│   │   │   ├── StrixPage.tsx, AiTriagePage.tsx, AgentConsole.tsx
+│   │   │   ├── RepeaterPage.tsx      # Standalone repeater + race + diff + history
+│   │   │   ├── AuthTesterPage.tsx    # JWT, OAuth, session/cookie, SAML
+│   │   │   ├── VulnIntelPage.tsx     # CVE, Nuclei, ExploitDB
+│   │   │   ├── CloudTesterPage.tsx   # IMDS, SSRF, buckets, credentials
+│   │   │   ├── ProtocolTesterPage.tsx # TLS, subdomains, LDAP, gRPC
+│   │   │   ├── CTFPage.tsx           # CTF auto-recon with persistent history
+│   │   │   ├── AiTriagePage.tsx      # Standalone AI triage (Ollama)
+│   │   │   ├── StrixPage.tsx, AgentConsole.tsx
 │   │   │   ├── RepackagePage.tsx, ReconPage.tsx, RiskPage.tsx
 │   │   │   ├── WsTestPage.tsx, GraphqlPage.tsx, PciTestPage.tsx
-│   │   │   ├── ChecklistPage.tsx   # MASVS + WSTG progress tracker
+│   │   │   ├── ChecklistPage.tsx
 │   │   │   └── Settings.tsx, ...
-│   │   ├── components/   # Shared UI components
-│   │   │   ├── layout/   # Sidebar, TopBar, StatusBar
-│   │   │   ├── common/   # Badge, CodeBlock, SplitPane
-│   │   │   └── analysis/ # RiskScoreCard, RiskGraph
 │   │   ├── api/          # Axios API client wrappers
+│   │   │   ├── repeater.ts, authTester.ts, vulnIntel.ts
+│   │   │   ├── cloudTester.ts, protocolTester.ts
+│   │   │   └── proxy.ts, scanner.ts, strix.ts, ollama.ts, ...
+│   │   ├── components/   # Shared UI components
 │   │   ├── hooks/        # Custom React hooks
 │   │   ├── store/        # Zustand state management
 │   │   └── types/        # TypeScript interfaces
 │   └── package.json
 ├── scanners/
-│   ├── aods/             # Android OWASP Dynamic Scanner (dyna.py + venv)
-│   └── iods/             # iOS OWASP Dynamic Scanner (ios_scan.py + venv)
+│   ├── aods/             # Android OWASP Dynamic Scanner
+│   └── iods/             # iOS OWASP Dynamic Scanner
 ├── scripts/
-│   ├── setup_windows.ps1 # Downloads apktool, jadx, platform-tools (Windows)
-│   └── setup_linux.sh    # Same for Linux/macOS/WSL
+│   ├── setup_windows.ps1
+│   └── setup_linux.sh
 ├── tools/                # apktool.jar, jadx/, platform-tools/ — not committed
 └── docker/               # Strix sandbox configuration
 ```
@@ -253,6 +325,10 @@ BluJay/
 | Docker | Required by Strix sandbox |
 | Strix CLI | Autonomous pentest agent |
 | Ollama + metatron-qwen | Local AI triage (no API key needed) |
+| Nuclei | Template-based vulnerability scanner (optional) |
+| ldap3 | LDAP testing (`pip install ldap3`, optional) |
+| grpcio | gRPC testing (`pip install grpcio grpcio-reflection`, optional) |
+| boto3 | AWS credential validation (`pip install boto3`, optional) |
 
 ## Quick Start
 
@@ -280,7 +356,7 @@ python run.py          # development (hot-reload on by default)
 python run.py --no-reload  # stable — use this when running the proxy
 ```
 
-> **Note:** Use `--no-reload` when using the proxy. Hot-reload wipes the `ProxyManager` state and orphans any running `mitmdump` process, which prevents new proxy sessions from starting until the orphan is killed.
+> **Note:** Use `--no-reload` when using the proxy. Hot-reload wipes the `ProxyManager` state and orphans any running `mitmdump` process.
 
 ### Frontend
 
@@ -296,110 +372,72 @@ Each scanner has its own virtualenv to avoid dependency conflicts:
 
 ```bash
 # AODS (Android)
-cd scanners/aods
-python -m venv aods_venv
-aods_venv\Scripts\activate
-pip install -r requirements/base.txt
+cd scanners/aods && python -m venv aods_venv && aods_venv\Scripts\activate && pip install -r requirements/base.txt
 
 # IODS (iOS)
-cd scanners/iods
-python -m venv iods_venv
-iods_venv\Scripts\activate
-pip install -r requirements/base.txt
+cd scanners/iods && python -m venv iods_venv && iods_venv\Scripts\activate && pip install -r requirements/base.txt
 ```
 
 ### Strix
 
+**Linux / WSL terminal:**
 ```bash
-# Install (Linux/WSL)
 curl -sSL https://strix.ai/install | bash
 source ~/.bashrc
 
-# Configure LLM (add to ~/.bashrc for persistence)
 export LLM_API_KEY=your-api-key
 export STRIX_LLM=anthropic/claude-sonnet-4-6   # or openai/gpt-4o
 
-# To use local Ollama instead (no API key)
+# Local Ollama (no API key)
 export LLM_API_KEY=ollama
 export LLM_API_BASE=http://localhost:11434
 export STRIX_LLM=ollama/metatron-qwen
 ```
 
-> **Windows users:** Strix installs into WSL. The backend detects it automatically via a WSL wrapper. If `strix` is not found, add it to your WSL PATH and ensure the WSL distribution is running.
+**Windows (PowerShell) — Strix runs inside WSL, BluJay bridges automatically:**
+```powershell
+wsl bash -c "curl -sSL https://strix.ai/install | bash && source ~/.bashrc"
+wsl bash -c "echo 'export LLM_API_KEY=ollama' >> ~/.bashrc"
+wsl bash -c "echo 'export LLM_API_BASE=http://localhost:11434' >> ~/.bashrc"
+wsl bash -c "echo 'export STRIX_LLM=ollama/metatron-qwen' >> ~/.bashrc"
+wsl strix --version
+```
 
 ### AI Triage (Ollama + metatron-qwen)
 
 ```bash
 # Install Ollama: https://ollama.com
-# Then build and run the metatron-qwen model:
 git clone https://github.com/sooryathejas/METATRON
 cd METATRON
 ollama create metatron-qwen -f Modelfile
 ollama run metatron-qwen
 ```
 
+> Ollama listens on `http://localhost:11434` — the BluJay backend connects to the same URL on both Windows and Linux.
+
 ## Proxy Setup
-
-### Verifying the proxy is running
-
-After clicking **Start** on the Proxy page, confirm the `mitmdump` process launched successfully:
-
-```
-GET http://localhost:8000/api/v1/proxy/status/0
-```
-
-Expected response when running correctly:
-```json
-{ "running": true, "pid": 12345, "port": 8080 }
-```
-
-If you get `{ "running": false, "pid": null }`:
-
-| Cause | Fix |
-|-------|-----|
-| **Proxy was never started** | Click **Start** on the Proxy page first |
-| **Hot-reload wiped the session** | Restart with `python run.py --no-reload`, then click Start |
-| **Orphaned `mitmdump` holding port 8080** | Run `taskkill /F /IM mitmdump.exe`, then restart the backend and click Start |
-| **`mitmdump` not found** | Ensure `mitmproxy` is installed in the same venv as the backend: `pip install mitmproxy` |
 
 ### Android traffic capture
 
-The proxy uses `adb reverse` to tunnel traffic through the USB connection — this bypasses Windows Firewall and avoids network topology issues entirely.
-
 1. Start the backend with `--no-reload`
-2. Click **Start** on the Proxy page — verify status returns `running: true`
-3. Click **Configure Device** — this automatically runs `adb reverse tcp:8080 tcp:8080` and sets the device proxy to `127.0.0.1:8080`
-4. Install the CA cert on the device:
-   - The cert is pushed to `/sdcard/Download/mitmproxy-ca-cert.pem` automatically
-   - **Android 11+:** Settings → Security → Encryption & credentials → Install a certificate → CA certificate → select the `.pem` from Downloads
-   - Confirm it appears under Settings → Security → Trusted credentials → User tab
-5. Test with `http://neverssl.com` in the device browser — the request should appear in the flow table immediately
+2. Click **Start** on the Proxy page
+3. Click **Configure Device** — runs `adb reverse tcp:8080 tcp:8080` and sets device proxy to `127.0.0.1:8080`
+4. Install the CA cert on the device (pushed automatically to `/sdcard/Download/mitmproxy-ca-cert.pem`)
+   - Android 11+: Settings → Security → Encryption & credentials → Install a certificate → CA certificate
+5. Test with `http://neverssl.com` — the request should appear in the flow table immediately
 
-> **HTTPS in modern apps (Android 7+):** Apps targeting API 24+ reject user-installed CA certs by default due to Network Security Config. Use the **Frida** page to attach to the target app and load the **SSL Pinning Bypass** script to force the app to trust the mitmproxy cert.
-
-To manually set up the ADB reverse tunnel without clicking Configure Device:
-```bash
-adb reverse tcp:8080 tcp:8080
-adb shell settings put global http_proxy 127.0.0.1:8080
-
-# To clear when done:
-adb shell settings put global http_proxy :0
-adb reverse --remove tcp:8080
-```
+> **HTTPS in modern apps (API 24+):** Use the **Frida** page to attach and load the **SSL Pinning Bypass** script.
 
 ### iOS traffic capture
 
-1. Connect iPhone via USB
-2. Start the proxy, then click **iOS Setup** in the toolbar (visible when an iOS device is detected)
-3. Start the cert server → scan the QR code with the iPhone camera
-4. Install the cert: Settings → General → VPN & Device Management → install
-5. Enable full trust: Settings → General → About → Certificate Trust Settings → toggle mitmproxy on
-6. Set the Wi-Fi proxy manually on the iPhone: Settings → Wi-Fi → [network] → Configure Proxy → Manual → enter your PC's LAN IP and port 8080
-7. For apps with SSL pinning: attach Frida and load the **iOS SSL Pinning Bypass** script
+1. Connect iPhone via USB, start the proxy, click **iOS Setup** in the toolbar
+2. Start the cert server → scan the QR code with iPhone camera
+3. Install the cert: Settings → General → VPN & Device Management → install
+4. Enable full trust: Settings → General → About → Certificate Trust Settings
+5. Set the Wi-Fi proxy on the iPhone to your PC's LAN IP and port 8080
+6. For apps with SSL pinning: attach Frida and load the **iOS SSL Pinning Bypass** script
 
 ## Configuration
-
-Copy `backend/.env` and adjust paths as needed. Tool path defaults in `config.py` resolve automatically relative to the repo root — only set them explicitly if your tools are installed elsewhere:
 
 ```env
 # Server
@@ -409,7 +447,7 @@ PORT=8000
 # Workspace
 WORKSPACE_DIR=~/.blujay
 
-# Tool paths — omit these to use the defaults (tools/ dir relative to repo root)
+# Tool paths — omit to use auto-resolved defaults (tools/ dir relative to repo root)
 # APKTOOL_JAR=/custom/path/apktool.jar
 # JADX_PATH=/custom/path/jadx
 # ADB_PATH=/custom/path/adb
@@ -424,23 +462,27 @@ AODS_VENV_PYTHON=scanners/aods/aods_venv/Scripts/python.exe
 IODS_PATH=scanners/iods/ios_scan.py
 IODS_VENV_PYTHON=scanners/iods/iods_venv/Scripts/python.exe
 
+# Optional — increases NVD API rate limit from 6 req/30s to 50 req/30s
+# NVD_API_KEY=your-nvd-api-key
+
 # Logging: DEBUG | INFO | WARNING | ERROR
 LOG_LEVEL=INFO
 ```
 
-> **Important:** Do not set `APKTOOL_JAR`, `JADX_PATH`, or `ADB_PATH` to relative paths. Pydantic-settings resolves them relative to the working directory at server startup (`backend/`), not the repo root. The defaults in `config.py` use `Path(__file__).parent.parent` and resolve correctly without any override.
-
 ## API
 
-The backend exposes a REST API at `http://localhost:8000/api/v1`. Interactive docs available at `http://localhost:8000/docs`.
-
-Key endpoint groups:
+The backend exposes a REST API at `http://localhost:8000/api/v1`. Interactive docs at `http://localhost:8000/docs`.
 
 | Prefix | Description |
 |--------|-------------|
 | `/analyses` | Static analysis (APK/IPA upload + device pull) |
 | `/sessions` | Dynamic analysis sessions |
-| `/proxy` | Proxy flows, replay, repeater |
+| `/proxy` | Proxy flows, replay |
+| `/repeater` | Standalone HTTP repeater + history |
+| `/auth` | JWT, OAuth/OIDC, session/cookie, SAML |
+| `/vuln` | CVE/NVD search, Nuclei, ExploitDB |
+| `/cloud` | IMDS, SSRF, bucket, credential testing |
+| `/protocol` | TLS, subdomain enum, LDAP, gRPC |
 | `/frida` | Dynamic instrumentation |
 | `/owasp` | OWASP MASVS scanner |
 | `/strix` | Autonomous pentest scans |
@@ -448,10 +490,8 @@ Key endpoint groups:
 | `/cve` | CVE correlation |
 | `/api-testing` | API test suites, tests, results, fuzzing |
 | `/fuzzing` | Standalone API fuzzing jobs |
-| `/tls` | TLS audit |
-| `/jwt` | JWT testing |
 | `/brute-force` | Brute force jobs |
-| `/ios-devices` | iOS device management + pull-and-analyze |
+| `/ios-devices` | iOS device management |
 | `/devices` | Android (ADB) device management |
 | `/pci` | PCI DSS compliance testing |
 | `/scanner` | Passive + active web scanner |
@@ -460,10 +500,11 @@ Key endpoint groups:
 | `/race` | HTTP/2 race condition testing |
 | `/ws-test` | WebSocket security testing |
 | `/graphql-test` | GraphQL security testing |
+| `/ctf` | CTF auto-recon scan management |
 
 ## Workspace
 
-Runtime data (database, decompiled output, uploaded APKs/IPAs, mitmproxy certs, Strix run output) is stored in `~/.blujay/` and is never committed.
+Runtime data (database, decompiled output, uploaded APKs/IPAs, mitmproxy certs, Strix run output) is stored in `~/.blujay/`. The `backend/data/` directory holds lightweight JSON persistence (CTF scans, repeater history, NVD cache) and is not committed.
 
 ## License
 

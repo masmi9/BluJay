@@ -9,7 +9,6 @@ import ProxyPage from '@/pages/ProxyPage'
 import FridaPage from '@/pages/FridaPage'
 import AgentConsole from '@/pages/AgentConsole'
 import OwaspScan from '@/pages/OwaspScan'
-import TestingLab from '@/pages/TestingLab'
 import SettingsPage from '@/pages/Settings'
 import CvePage from '@/pages/CvePage'
 import WebViewPage from '@/pages/WebViewPage'
@@ -18,9 +17,14 @@ import DiffPage from '@/pages/DiffPage'
 import CampaignPage from '@/pages/CampaignPage'
 import ChecklistPage from '@/pages/ChecklistPage'
 import ApiScannerPage from '@/pages/ApiScannerPage'
-import DecodePage from '@/pages/DecodePage'
+import AiTriagePage from '@/pages/AiTriagePage'
 import PciTestPage from '@/pages/PciTestPage'
 import CTFPage from '@/pages/CTFPage'
+import RepeaterPage from '@/pages/RepeaterPage'
+import AuthTesterPage from '@/pages/AuthTesterPage'
+import VulnIntelPage from '@/pages/VulnIntelPage'
+import CloudTesterPage from '@/pages/CloudTesterPage'
+import ProtocolTesterPage from '@/pages/ProtocolTesterPage'
 
 export default function App() {
   return (
@@ -38,7 +42,6 @@ export default function App() {
               <Route path="/frida" element={<FridaPage />} />
               <Route path="/agent" element={<AgentConsole />} />
               <Route path="/owasp" element={<OwaspScan />} />
-              <Route path="/testing" element={<TestingLab />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/cve/:id" element={<CvePage />} />
               <Route path="/webview/:id" element={<WebViewPage />} />
@@ -47,18 +50,23 @@ export default function App() {
               <Route path="/campaigns" element={<CampaignPage />} />
               <Route path="/checklist" element={<ChecklistPage />} />
               <Route path="/api-scanner" element={<ApiScannerPage />} />
-              <Route path="/decode" element={<DecodePage />} />
+              <Route path="/ai-triage" element={<AiTriagePage />} />
               <Route path="/pci" element={<PciTestPage />} />
               <Route path="/ctf" element={<CTFPage />} />
+              <Route path="/repeater" element={<RepeaterPage />} />
+              <Route path="/auth-tester" element={<AuthTesterPage />} />
+              <Route path="/vuln-intel" element={<VulnIntelPage />} />
+              <Route path="/cloud-tester" element={<CloudTesterPage />} />
+              <Route path="/protocol-tester" element={<ProtocolTesterPage />} />
               {/* Legacy redirects */}
               <Route path="/scanner" element={<Navigate to="/api-scanner" replace />} />
               <Route path="/api-testing" element={<Navigate to="/api-scanner" replace />} />
               <Route path="/fuzzing" element={<Navigate to="/api-scanner" replace />} />
               <Route path="/brute-force" element={<Navigate to="/api-scanner" replace />} />
               <Route path="/strix" element={<Navigate to="/api-scanner" replace />} />
-              <Route path="/tls" element={<Navigate to="/decode" replace />} />
-              <Route path="/jwt" element={<Navigate to="/decode" replace />} />
-              <Route path="/ai-triage" element={<Navigate to="/decode" replace />} />
+              <Route path="/tls" element={<Navigate to="/protocol-tester" replace />} />
+              <Route path="/jwt" element={<Navigate to="/auth-tester" replace />} />
+              <Route path="/decode" element={<Navigate to="/ai-triage" replace />} />
               <Route path="/ipa" element={<Navigate to="/owasp" replace />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

@@ -1,7 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react'
+﻿import React, { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Virtuoso } from 'react-virtuoso'
-import { Play, Square, Trash2, Download, RefreshCw, Smartphone, X, Plus, Send, ChevronDown, Clipboard, Check, Apple, Radio, Filter, ShieldAlert, Zap } from 'lucide-react'
+import { Play, Square, Trash2, Download, Smartphone, X, Send, Clipboard, Check, Apple, Radio, Filter, ShieldAlert } from 'lucide-react'
 import { clsx } from 'clsx'
 import { proxyApi } from '@/api/proxy'
 import { addScannerUrl } from '@/pages/ScannerPage'
@@ -12,38 +13,15 @@ import { CodeBlock } from '@/components/common/CodeBlock'
 import { useProxyStore } from '@/store/proxyStore'
 import { useDeviceStore } from '@/store/deviceStore'
 import { useProxyFlows } from '@/hooks/useProxyFlows'
-import type { ProxyFlow, ProxyFlowDetail, RepeaterTab } from '@/types/proxy'
+import type { ProxyFlow, ProxyFlowDetail } from '@/types/proxy'
 import type { IosDeviceInfo } from '@/types/adb'
-
-let repeaterCounter = 1
-
-function makeTab(overrides: Partial<RepeaterTab> = {}): RepeaterTab {
-  return {
-    id: crypto.randomUUID(),
-    label: `Request ${repeaterCounter++}`,
-    method: 'GET',
-    url: '',
-    headers: [{ key: 'Content-Type', value: 'application/json' }],
-    body: '',
-    response: null,
-    loading: false,
-    raceCount: 10,
-    raceResults: [],
-    raceRunning: false,
-    ...overrides,
-  }
-}
-
-const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD']
 
 export default function ProxyPage() {
   const { flows, selectedFlowId, selectFlow, sessionId, setSessionId, clearFlows, isRunning: running, setIsRunning: setRunning } = useProxyStore()
   const { activeSession, devices } = useDeviceStore()
+  const navigate = useNavigate()
   const [configuring, setConfiguring] = useState(false)
   const [configStatus, setConfigStatus] = useState<{ ok: boolean; msg: string } | null>(null)
-  const [pageTab, setPageTab] = useState<'history' | 'repeater'>('history')
-  const [repeaterTabs, setRepeaterTabs] = useState<RepeaterTab[]>([makeTab()])
-  const [activeRepeaterId, setActiveRepeaterId] = useState<string>(repeaterTabs[0].id)
   const statusTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const [iosSetupOpen, setIosSetupOpen] = useState(false)
@@ -75,7 +53,7 @@ export default function ProxyPage() {
     queryFn: proxyApi.getLocalIp,
     staleTime: Infinity,
   })
-  const localIp = localIpData?.local_ip ?? '…'
+  const localIp = localIpData?.local_ip ?? 'â€¦'
   const allIps = localIpData?.all_ips ?? []
 
   const androidIp = selectedAndroidIp ?? localIp
@@ -140,7 +118,7 @@ export default function ProxyPage() {
     try {
       const result = await proxyApi.configureDevice(connectedSerial, androidIp, proxyPort)
       if (result.cert?.pushed) {
-        showStatus(true, `Proxy set to ${androidIp}:${proxyPort}. Cert pushed to ${result.cert.remote_path} — install via Settings → Security → Install certificate → CA certificate.`)
+        showStatus(true, `Proxy set to ${androidIp}:${proxyPort}. Cert pushed to ${result.cert.remote_path} â€” install via Settings â†’ Security â†’ Install certificate â†’ CA certificate.`)
       } else {
         showStatus(true, `Proxy set to ${androidIp}:${proxyPort}.`)
       }
@@ -157,75 +135,19 @@ export default function ProxyPage() {
     catch { showStatus(false, 'Failed to clear device proxy') }
   }
 
-  // Send the selected captured flow to a new Repeater tab
+  // Send the selected captured flow to the standalone Repeater page
   const sendToRepeater = (flow: ProxyFlowDetail) => {
-    const rawHeaders: Record<string, string> = JSON.parse(flow.request_headers || '{}')
-    const headers = Object.entries(rawHeaders).map(([key, value]) => ({ key, value }))
+    const headers: Record<string, string> = (() => { try { return JSON.parse(flow.request_headers || '{}') } catch { return {} } })()
 
-    let body = ''
+    let body: string | null = null
     if (flow.request_body) {
       try { body = typeof flow.request_body === 'string' ? flow.request_body : new TextDecoder().decode(flow.request_body as unknown as Uint8Array) }
       catch { body = String(flow.request_body) }
     }
 
-    const tab = makeTab({
-      label: `${flow.method} ${flow.path.slice(0, 24)}`,
-      method: flow.method,
-      url: flow.url,
-      headers,
-      body,
-    })
-    setRepeaterTabs((prev) => [...prev, tab])
-    setActiveRepeaterId(tab.id)
-    setPageTab('repeater')
+    sessionStorage.setItem('repeater-preload', JSON.stringify({ method: flow.method, url: flow.url, headers, body }))
+    navigate('/repeater')
   }
-
-  // Mutate a single repeater tab
-  const updateTab = (id: string, patch: Partial<RepeaterTab>) =>
-    setRepeaterTabs((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t)))
-
-  const addRepeaterTab = () => {
-    const tab = makeTab()
-    setRepeaterTabs((prev) => [...prev, tab])
-    setActiveRepeaterId(tab.id)
-  }
-
-  const closeRepeaterTab = (id: string) => {
-    setRepeaterTabs((prev) => {
-      const next = prev.filter((t) => t.id !== id)
-      if (next.length === 0) {
-        const fresh = makeTab()
-        setActiveRepeaterId(fresh.id)
-        return [fresh]
-      }
-      if (activeRepeaterId === id) setActiveRepeaterId(next[next.length - 1].id)
-      return next
-    })
-  }
-
-  const sendRepeaterRequest = async (tab: RepeaterTab) => {
-    if (!tab.url) return
-    updateTab(tab.id, { loading: true, response: null })
-    try {
-      const headersObj = Object.fromEntries(
-        tab.headers.filter((h) => h.key.trim()).map((h) => [h.key.trim(), h.value])
-      )
-      const response = await proxyApi.repeater(tab.method, tab.url, headersObj, tab.body)
-      updateTab(tab.id, { loading: false, response })
-    } catch (e: any) {
-      updateTab(tab.id, {
-        loading: false,
-        response: {
-          status_code: 0,
-          headers: {},
-          body: e?.response?.data?.detail ?? e?.message ?? 'Request failed',
-          duration_ms: 0,
-        },
-      })
-    }
-  }
-
-  const activeRepeaterTab = repeaterTabs.find((t) => t.id === activeRepeaterId) ?? repeaterTabs[0]
 
   return (
     <div className="flex flex-col h-full">
@@ -376,76 +298,27 @@ export default function ProxyPage() {
         />
       )}
 
-      {/* Page tab bar */}
-      <div className="flex border-b border-bg-border bg-bg-surface shrink-0">
-        {(['history', 'repeater'] as const).map((t) => (
-          <button key={t} onClick={() => setPageTab(t)}
-            className={clsx('px-5 py-2 text-xs font-medium capitalize transition-colors',
-              pageTab === t ? 'text-zinc-200 border-b-2 border-accent' : 'text-zinc-500 hover:text-zinc-300')}>
-            {t}
-          </button>
-        ))}
-      </div>
-
-      {/* History tab */}
-      {pageTab === 'history' && (
-        <SplitPane
-          direction="vertical"
-          defaultSplit={45}
-          className="flex-1"
-          left={<FlowTable
-            flows={blockedHosts.length > 0 ? flows.filter((f) => !blockedHosts.some((b) => f.host?.includes(b))) : flows}
-            selectedId={selectedFlowId}
-            onSelect={selectFlow}
-          />}
-          right={
-            <FlowDetailPanel
-              flow={flowDetail ?? null}
-              onSendToRepeater={flowDetail ? () => sendToRepeater(flowDetail) : undefined}
-            />
-          }
-        />
-      )}
-
-      {/* Repeater tab */}
-      {pageTab === 'repeater' && (
-        <div className="flex flex-col flex-1 overflow-hidden">
-          {/* Repeater tab bar */}
-          <div className="flex items-center gap-0 border-b border-bg-border bg-bg-surface shrink-0 overflow-x-auto">
-            {repeaterTabs.map((tab) => (
-              <div key={tab.id}
-                className={clsx('group flex items-center gap-1.5 px-3 py-2 text-xs font-mono border-r border-bg-border cursor-pointer shrink-0 transition-colors',
-                  activeRepeaterId === tab.id ? 'bg-bg-elevated text-zinc-200' : 'text-zinc-500 hover:text-zinc-300 hover:bg-bg-elevated/50')}
-                onClick={() => setActiveRepeaterId(tab.id)}>
-                <span className="max-w-[140px] truncate">{tab.label}</span>
-                <button onClick={(e) => { e.stopPropagation(); closeRepeaterTab(tab.id) }}
-                  title="Close tab" aria-label="Close tab"
-                  className="opacity-0 group-hover:opacity-100 text-zinc-600 hover:text-zinc-300 transition-opacity">
-                  <X size={10} />
-                </button>
-              </div>
-            ))}
-            <button onClick={addRepeaterTab} title="New tab" aria-label="New tab"
-              className="px-3 py-2 text-zinc-600 hover:text-zinc-300 shrink-0 transition-colors">
-              <Plus size={13} />
-            </button>
-          </div>
-
-          {/* Repeater content */}
-          {activeRepeaterTab && (
-            <RepeaterPanel
-              tab={activeRepeaterTab}
-              onChange={(patch) => updateTab(activeRepeaterTab.id, patch)}
-              onSend={() => sendRepeaterRequest(activeRepeaterTab)}
-            />
-          )}
-        </div>
-      )}
+      <SplitPane
+        direction="vertical"
+        defaultSplit={45}
+        className="flex-1"
+        left={<FlowTable
+          flows={blockedHosts.length > 0 ? flows.filter((f) => !blockedHosts.some((b) => f.host?.includes(b))) : flows}
+          selectedId={selectedFlowId}
+          onSelect={selectFlow}
+        />}
+        right={
+          <FlowDetailPanel
+            flow={flowDetail ?? null}
+            onSendToRepeater={flowDetail ? () => sendToRepeater(flowDetail) : undefined}
+          />
+        }
+      />
     </div>
   )
 }
 
-// ─── iOS setup panel ─────────────────────────────────────────────────────────
+// â”€â”€â”€ iOS setup panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false)
@@ -476,7 +349,7 @@ function IosSetupPanel({ iosDevices, localIp, allIps, proxyPort, proxyRunning, o
 
   // Sync selectedIp when localIp loads (async query)
   useEffect(() => {
-    if (localIp && localIp !== '…') setSelectedIp(localIp)
+    if (localIp && localIp !== 'â€¦') setSelectedIp(localIp)
   }, [localIp])
 
   const certLanUrl = certServerRunning ? `http://${selectedIp}:${certServerPort}/cert` : null
@@ -494,9 +367,9 @@ function IosSetupPanel({ iosDevices, localIp, allIps, proxyPort, proxyRunning, o
       if (detail) {
         setCertServerError(`${detail}`)
       } else if (status) {
-        setCertServerError(`Server returned ${status} — check the backend console`)
+        setCertServerError(`Server returned ${status} â€” check the backend console`)
       } else {
-        setCertServerError(e?.message ?? 'Request failed — is the backend running?')
+        setCertServerError(e?.message ?? 'Request failed â€” is the backend running?')
       }
     }
   }
@@ -523,8 +396,8 @@ function IosSetupPanel({ iosDevices, localIp, allIps, proxyPort, proxyRunning, o
             <span className="text-xs font-semibold text-zinc-200">iOS Proxy Setup</span>
             {iosDevices.map((d) => (
               <span key={d.udid} className="text-xs text-zinc-500 font-mono">
-                {d.name || d.model || d.udid.slice(0, 12) + '…'}
-                {d.jailbroken && <span className="ml-1 text-yellow-400">⚡</span>}
+                {d.name || d.model || d.udid.slice(0, 12) + 'â€¦'}
+                {d.jailbroken && <span className="ml-1 text-yellow-400">âš¡</span>}
               </span>
             ))}
           </div>
@@ -544,7 +417,7 @@ function IosSetupPanel({ iosDevices, localIp, allIps, proxyPort, proxyRunning, o
               <>
                 {!proxyRunning && (
                   <div className="bg-yellow-500/10 border border-yellow-500/20 rounded px-2 py-1.5">
-                    <p className="text-xs text-yellow-400">⚠ Start the proxy first — the CA cert is generated when mitmproxy starts.</p>
+                    <p className="text-xs text-yellow-400">âš  Start the proxy first â€” the CA cert is generated when mitmproxy starts.</p>
                   </div>
                 )}
                 <p className="text-xs text-zinc-500">
@@ -614,8 +487,8 @@ function IosSetupPanel({ iosDevices, localIp, allIps, proxyPort, proxyRunning, o
                 )}
                 <ol className="text-xs text-zinc-500 space-y-0.5 list-decimal list-inside">
                   <li>Scan QR or open URL in Safari</li>
-                  <li>Settings → General → VPN &amp; Device Management → install</li>
-                  <li>Settings → General → About → Certificate Trust Settings → enable full trust</li>
+                  <li>Settings â†’ General â†’ VPN &amp; Device Management â†’ install</li>
+                  <li>Settings â†’ General â†’ About â†’ Certificate Trust Settings â†’ enable full trust</li>
                 </ol>
               </>
             )}
@@ -627,7 +500,7 @@ function IosSetupPanel({ iosDevices, localIp, allIps, proxyPort, proxyRunning, o
               <span className="text-blue-400 mr-1.5">2</span>Configure Wi-Fi Proxy
             </p>
             <p className="text-xs text-zinc-500">
-              Settings → Wi-Fi → [your network] → Configure Proxy → <strong className="text-zinc-400">Manual</strong>
+              Settings â†’ Wi-Fi â†’ [your network] â†’ Configure Proxy â†’ <strong className="text-zinc-400">Manual</strong>
             </p>
             <div className="space-y-1.5">
               <div className="flex items-center gap-2">
@@ -663,7 +536,7 @@ function IosSetupPanel({ iosDevices, localIp, allIps, proxyPort, proxyRunning, o
             </p>
             {anyJailbroken && (
               <p className="text-xs text-yellow-500/80">
-                ⚡ Jailbroken device detected — Frida should attach without issues.
+                âš¡ Jailbroken device detected â€” Frida should attach without issues.
               </p>
             )}
           </div>
@@ -674,7 +547,7 @@ function IosSetupPanel({ iosDevices, localIp, allIps, proxyPort, proxyRunning, o
   )
 }
 
-// ─── Flow table ───────────────────────────────────────────────────────────────
+// â”€â”€â”€ Flow table â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 type DisplayFlow = ProxyFlow & { _count: number }
 
@@ -734,7 +607,7 @@ function FlowTable({ flows, selectedId, onSelect }: {
                 <span className="w-20 flex items-center gap-1.5">
                   <Badge variant="method" value={flow.method} />
                   {flow._count > 1 && (
-                    <span className="text-[10px] text-zinc-500 font-mono">×{flow._count}</span>
+                    <span className="text-[10px] text-zinc-500 font-mono">Ã—{flow._count}</span>
                   )}
                 </span>
                 <span className="w-32 text-zinc-400 truncate">{flow.host}</span>
@@ -754,7 +627,7 @@ function FlowTable({ flows, selectedId, onSelect }: {
   )
 }
 
-// ─── Flow detail panel ────────────────────────────────────────────────────────
+// â”€â”€â”€ Flow detail panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function parseBody(raw: string | null | undefined, headers: Record<string, string>, fallbackContentType?: string) {
   if (!raw) return { display: '', isJson: false }
@@ -854,7 +727,7 @@ function FlowDetailPanel({ flow, onSendToRepeater }: {
             headers={respHeaders}
             body={resp.display}
             isJson={resp.isJson}
-            statusLine={flow.response_status ? `${flow.response_status}${flow.duration_ms ? ` · ${flow.duration_ms.toFixed(0)}ms` : ''}` : undefined}
+            statusLine={flow.response_status ? `${flow.response_status}${flow.duration_ms ? ` Â· ${flow.duration_ms.toFixed(0)}ms` : ''}` : undefined}
           />
         </div>
       </div>
@@ -862,449 +735,3 @@ function FlowDetailPanel({ flow, onSendToRepeater }: {
   )
 }
 
-// ─── Repeater panel ───────────────────────────────────────────────────────────
-
-// ─── Race panel ───────────────────────────────────────────────────────────────
-
-function RacePanel({ tab, onChange }: {
-  tab: RepeaterTab
-  onChange: (patch: Partial<RepeaterTab>) => void
-}) {
-  const run = async () => {
-    if (!tab.url) return
-    onChange({ raceRunning: true, raceResults: [] })
-    try {
-      const headersObj = Object.fromEntries(
-        tab.headers.filter((h) => h.key.trim()).map((h) => [h.key.trim(), h.value])
-      )
-      const res = await import('axios').then((ax) =>
-        ax.default.post('/api/v1/race/run', {
-          method: tab.method,
-          url: tab.url,
-          headers: headersObj,
-          body: tab.body,
-          count: tab.raceCount,
-        })
-      )
-      onChange({ raceResults: res.data.results, raceRunning: false })
-    } catch (e: any) {
-      onChange({ raceRunning: false })
-    }
-  }
-
-  const results = tab.raceResults
-  const statuses = results.map((r) => r.status).filter(Boolean)
-  const uniqueStatuses = [...new Set(statuses)]
-  const minMs = results.length ? Math.min(...results.map((r) => r.duration_ms)) : 0
-  const maxMs = results.length ? Math.max(...results.map((r) => r.duration_ms)) : 0
-
-  return (
-    <div className="flex flex-col h-full overflow-hidden">
-      {/* Controls */}
-      <div className="flex items-center gap-3 px-3 py-2 border-b border-bg-border bg-bg-surface shrink-0">
-        <span className="text-xs text-zinc-500 font-mono truncate flex-1">{tab.url || 'No URL set — configure in Repeater'}</span>
-        <label className="text-xs text-zinc-500">Requests</label>
-        <input
-          type="number" min={1} max={50} value={tab.raceCount}
-          onChange={(e) => onChange({ raceCount: Number(e.target.value) })}
-          title="Number of concurrent requests"
-          aria-label="Number of concurrent requests"
-          className="w-16 bg-bg-elevated border border-bg-border rounded px-2 py-1 text-xs font-mono text-zinc-300 focus:outline-none focus:border-red-500/50"
-        />
-        <button
-          onClick={run}
-          disabled={tab.raceRunning || !tab.url}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-red-500/20 text-red-400 hover:bg-red-500/30 rounded disabled:opacity-40 transition-colors font-medium"
-          title="Fire all requests simultaneously"
-        >
-          {tab.raceRunning
-            ? <><RefreshCw size={12} className="animate-spin" /> Racing…</>
-            : <><Zap size={12} /> Race</>}
-        </button>
-      </div>
-
-      {/* Summary */}
-      {results.length > 0 && (
-        <div className="flex items-center gap-4 px-3 py-1.5 bg-bg-elevated border-b border-bg-border shrink-0 text-xs">
-          <span className="text-zinc-500">{results.length} requests</span>
-          <span className="text-zinc-500">Statuses: <span className="text-zinc-300">{uniqueStatuses.join(', ') || '—'}</span></span>
-          <span className="text-zinc-500">Fastest: <span className="text-green-400">{minMs}ms</span></span>
-          <span className="text-zinc-500">Slowest: <span className="text-amber-400">{maxMs}ms</span></span>
-          <span className="text-zinc-500">Spread: <span className={clsx(maxMs - minMs > 50 ? 'text-red-400' : 'text-zinc-300')}>{(maxMs - minMs).toFixed(1)}ms</span></span>
-        </div>
-      )}
-
-      {/* Results table */}
-      <div className="flex-1 overflow-auto">
-        {results.length === 0 && !tab.raceRunning && (
-          <div className="flex flex-col items-center justify-center h-full text-zinc-600 gap-2">
-            <Zap size={28} />
-            <p className="text-sm">No results yet</p>
-            <p className="text-xs text-center max-w-xs">
-              Set up your request in the Repeater tab, then click Race to fire {tab.raceCount} simultaneous requests.
-              Look for differing status codes or response sizes — those indicate a race condition window.
-            </p>
-          </div>
-        )}
-        {results.length > 0 && (
-          <table className="w-full text-xs font-mono">
-            <thead className="sticky top-0 bg-bg-surface border-b border-bg-border">
-              <tr className="text-zinc-500">
-                <th className="text-left px-3 py-1.5 w-10">#</th>
-                <th className="text-left px-3 py-1.5 w-16">Status</th>
-                <th className="text-left px-3 py-1.5 w-20">Length</th>
-                <th className="text-left px-3 py-1.5 w-24">Time</th>
-                <th className="text-left px-3 py-1.5">Response snippet / Error</th>
-              </tr>
-            </thead>
-            <tbody>
-              {results.map((r) => {
-                const isAnomaly = r.status !== results[0].status || Math.abs(r.length - results[0].length) > 20
-                return (
-                  <tr key={r.idx} className={clsx(
-                    'border-b border-bg-border/50 hover:bg-bg-elevated transition-colors',
-                    isAnomaly && 'bg-red-500/5'
-                  )}>
-                    <td className="px-3 py-1 text-zinc-600">{r.idx + 1}</td>
-                    <td className="px-3 py-1">
-                      <span className={clsx(
-                        r.status === 0 ? 'text-red-400' :
-                        r.status >= 500 ? 'text-red-400' :
-                        r.status >= 400 ? 'text-amber-400' :
-                        r.status >= 300 ? 'text-yellow-400' : 'text-green-400'
-                      )}>{r.status || 'ERR'}</span>
-                    </td>
-                    <td className="px-3 py-1 text-zinc-400">{r.length}</td>
-                    <td className="px-3 py-1 text-zinc-400">{r.duration_ms}ms</td>
-                    <td className="px-3 py-1 text-zinc-500 truncate max-w-xs">
-                      {r.error || r.body_snippet}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        )}
-      </div>
-    </div>
-  )
-}
-
-// ── Raw ↔ structured helpers ──────────────────────────────────────────────────
-
-function tabToRaw(tab: RepeaterTab): string {
-  let path = '/'
-  let host = ''
-  try {
-    const u = new URL(tab.url)
-    path = u.pathname + u.search + u.hash || '/'
-    host = u.host
-  } catch { /* bad url */ }
-
-  const lines: string[] = [`${tab.method} ${path} HTTP/1.1`]
-  if (host) lines.push(`Host: ${host}`)
-  for (const h of tab.headers) {
-    if (h.key.trim()) lines.push(`${h.key}: ${h.value}`)
-  }
-  lines.push('')
-  if (tab.body) {
-    try { lines.push(JSON.stringify(JSON.parse(tab.body), null, 2)) }
-    catch { lines.push(tab.body) }
-  }
-  return lines.join('\n')
-}
-
-function rawToTab(raw: string, existingUrl: string): Partial<RepeaterTab> {
-  const lines = raw.split('\n')
-  const firstLine = lines[0]?.trim() ?? ''
-  const parts = firstLine.split(/\s+/)
-  const method = parts[0] || 'GET'
-  const path = parts[1] || '/'
-
-  const headers: { key: string; value: string }[] = []
-  let host = ''
-  let bodyStart = lines.length
-
-  for (let i = 1; i < lines.length; i++) {
-    if (lines[i].trim() === '') { bodyStart = i + 1; break }
-    const colon = lines[i].indexOf(':')
-    if (colon > 0) {
-      const key = lines[i].slice(0, colon).trim()
-      const value = lines[i].slice(colon + 1).trim()
-      if (key.toLowerCase() === 'host') host = value
-      else headers.push({ key, value })
-    }
-  }
-
-  const body = lines.slice(bodyStart).join('\n').trimEnd()
-
-  let url = existingUrl
-  try {
-    const base = new URL(existingUrl)
-    url = host ? `${base.protocol}//${host}${path}` : `${base.origin}${path}`
-  } catch {
-    if (host) url = `https://${host}${path}`
-  }
-
-  return { method, url, headers, body }
-}
-
-function RepeaterPanel({ tab, onChange, onSend }: {
-  tab: RepeaterTab
-  onChange: (patch: Partial<RepeaterTab>) => void
-  onSend: () => void
-}) {
-  const [viewMode, setViewMode] = useState<'enhanced' | 'raw'>(() =>
-    (localStorage.getItem('repeater-view-mode') as 'enhanced' | 'raw') ?? 'enhanced'
-  )
-  const [rawText, setRawText] = useState(() => tabToRaw(tab))
-
-  // When switching TO raw, regenerate from tab state
-  const switchMode = (m: 'enhanced' | 'raw') => {
-    if (m === 'raw') setRawText(tabToRaw(tab))
-    setViewMode(m)
-    localStorage.setItem('repeater-view-mode', m)
-  }
-
-  // Raw text change → parse and sync to tab state
-  const handleRawChange = (val: string) => {
-    setRawText(val)
-    onChange(rawToTab(val, tab.url))
-  }
-
-  const addHeader = () => onChange({ headers: [...tab.headers, { key: '', value: '' }] })
-  const removeHeader = (i: number) => onChange({ headers: tab.headers.filter((_, idx) => idx !== i) })
-  const updateHeader = (i: number, field: 'key' | 'value', val: string) => {
-    const next = tab.headers.map((h, idx) => idx === i ? { ...h, [field]: val } : h)
-    onChange({ headers: next })
-  }
-
-  const resp = tab.response
-  const respIsJson = resp ? (resp.headers['content-type'] ?? '').includes('json') : false
-  let respBody = resp?.body ?? ''
-  if (respIsJson) {
-    try { respBody = JSON.stringify(JSON.parse(respBody), null, 2) } catch { /* leave as-is */ }
-  }
-
-  const statusColor = !resp ? '' :
-    resp.status_code === 0 ? 'text-red-400' :
-    resp.status_code >= 500 ? 'text-red-400' :
-    resp.status_code >= 400 ? 'text-orange-400' :
-    resp.status_code >= 300 ? 'text-yellow-400' : 'text-green-400'
-
-  const requestEditor = (
-    <div className="flex flex-col h-full overflow-hidden">
-      {/* Toolbar: URL bar (BluJay mode) or just Send (Raw mode) */}
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-bg-border bg-bg-surface shrink-0">
-        {viewMode === 'enhanced' && (
-          <>
-            <div className="relative">
-              <select
-                value={tab.method}
-                onChange={(e) => onChange({ method: e.target.value })}
-                aria-label="HTTP method"
-                title="HTTP method"
-                className="appearance-none bg-bg-elevated border border-bg-border rounded px-2 py-1.5 text-xs font-mono text-zinc-200 pr-6 focus:outline-none focus:border-accent"
-              >
-                {METHODS.map((m) => <option key={m}>{m}</option>)}
-              </select>
-              <ChevronDown size={10} className="absolute right-1.5 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
-            </div>
-            <input
-              className="flex-1 bg-bg-elevated border border-bg-border rounded px-2 py-1.5 text-xs font-mono text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-accent"
-              placeholder="https://api.example.com/endpoint"
-              value={tab.url}
-              onChange={(e) => onChange({ url: e.target.value })}
-              onKeyDown={(e) => e.key === 'Enter' && onSend()}
-            />
-          </>
-        )}
-        {viewMode === 'raw' && (
-          <span className="text-xs font-mono text-zinc-500 flex-1 truncate">{tab.url || 'Edit the request line below'}</span>
-        )}
-
-        {/* View mode toggle */}
-        <div className="flex items-center rounded border border-bg-border overflow-hidden shrink-0">
-          {(['enhanced', 'raw'] as const).map((m) => (
-            <button
-              key={m}
-              onClick={() => switchMode(m)}
-              title={m === 'enhanced' ? 'Enhanced split view' : 'Raw HTTP (Burp style)'}
-              className={clsx(
-                'px-2 py-1 text-xs transition-colors capitalize',
-                viewMode === m ? 'bg-accent text-white' : 'text-zinc-500 hover:text-zinc-200 hover:bg-bg-elevated'
-              )}
-            >
-              {m === 'enhanced' ? 'Enhanced' : 'Raw'}
-            </button>
-          ))}
-        </div>
-
-        <button
-          onClick={onSend}
-          disabled={tab.loading || !tab.url}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium bg-accent/20 text-accent hover:bg-accent/30 disabled:opacity-40 transition-colors"
-        >
-          <Send size={12} />
-          {tab.loading ? 'Sending…' : 'Send'}
-        </button>
-      </div>
-
-      {/* Enhanced split view */}
-      {viewMode === 'enhanced' && (
-        <SplitPane
-          direction="horizontal"
-          defaultSplit={40}
-          className="flex-1"
-          left={
-            <div className="flex flex-col h-full overflow-hidden">
-              <div className="flex items-center justify-between px-3 py-1.5 border-b border-bg-border shrink-0">
-                <span className="text-xs text-zinc-600 uppercase tracking-wide">Headers</span>
-                <button onClick={addHeader} title="Add header" aria-label="Add header" className="text-zinc-600 hover:text-zinc-300 transition-colors">
-                  <Plus size={12} />
-                </button>
-              </div>
-              <div className="flex-1 overflow-auto p-2 space-y-1">
-                {tab.headers.map((h, i) => (
-                  <div key={i} className="flex items-center gap-1">
-                    <input
-                      className="w-36 bg-bg-elevated border border-bg-border rounded px-2 py-1 text-xs font-mono text-zinc-300 placeholder-zinc-600 focus:outline-none focus:border-accent"
-                      placeholder="Header-Name"
-                      value={h.key}
-                      onChange={(e) => updateHeader(i, 'key', e.target.value)}
-                    />
-                    <span className="text-zinc-600 text-xs">:</span>
-                    <input
-                      className="flex-1 bg-bg-elevated border border-bg-border rounded px-2 py-1 text-xs font-mono text-zinc-300 placeholder-zinc-600 focus:outline-none focus:border-accent"
-                      placeholder="value"
-                      value={h.value}
-                      onChange={(e) => updateHeader(i, 'value', e.target.value)}
-                    />
-                    <button onClick={() => removeHeader(i)} title="Remove header" aria-label="Remove header" className="text-zinc-700 hover:text-red-400 transition-colors shrink-0">
-                      <X size={11} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          }
-          right={
-            <div className="flex flex-col h-full overflow-hidden">
-              <div className="px-3 py-1.5 border-b border-bg-border shrink-0">
-                <span className="text-xs text-zinc-600 uppercase tracking-wide">Body</span>
-              </div>
-              <textarea
-                className="flex-1 bg-transparent px-3 py-2 text-xs font-mono text-zinc-300 placeholder-zinc-600 resize-none focus:outline-none"
-                placeholder="Request body…"
-                value={tab.body}
-                onChange={(e) => onChange({ body: e.target.value })}
-                spellCheck={false}
-              />
-            </div>
-          }
-        />
-      )}
-
-      {/* Raw HTTP view */}
-      {viewMode === 'raw' && (
-        <textarea
-          className="flex-1 bg-transparent px-4 py-3 text-xs font-mono text-zinc-200 resize-none focus:outline-none leading-relaxed"
-          value={rawText}
-          onChange={(e) => handleRawChange(e.target.value)}
-          spellCheck={false}
-          aria-label="Raw HTTP request"
-        />
-      )}
-    </div>
-  )
-
-  const responsePanel = (
-    <div className="flex flex-col h-full overflow-hidden">
-      <div className="flex items-center gap-3 px-3 py-1.5 border-b border-bg-border bg-bg-surface shrink-0">
-        <span className="text-xs text-zinc-600 uppercase tracking-wide">Response</span>
-        {resp && resp.status_code !== 0 && (
-          <>
-            <span className={clsx('text-xs font-mono font-semibold', statusColor)}>{resp.status_code}</span>
-            <span className="text-xs text-zinc-600">{resp.duration_ms.toFixed(0)}ms</span>
-          </>
-        )}
-      </div>
-
-      {!resp && !tab.loading && (
-        <div className="flex items-center justify-center flex-1 text-zinc-600 text-sm">
-          Send a request to see the response
-        </div>
-      )}
-
-      {tab.loading && (
-        <div className="flex items-center justify-center flex-1 text-zinc-500 text-sm gap-2">
-          <RefreshCw size={14} className="animate-spin" /> Sending…
-        </div>
-      )}
-
-      {resp && !tab.loading && (
-        <SplitPane
-          direction="horizontal"
-          defaultSplit={40}
-          className="flex-1"
-          left={
-            <div className="p-3 overflow-auto space-y-1">
-              <p className="text-xs text-zinc-600 mb-2 uppercase tracking-wide">Headers</p>
-              {Object.entries(resp.headers).map(([k, v]) => (
-                <div key={k} className="flex gap-2 text-xs font-mono">
-                  <span className="text-zinc-500 shrink-0">{k}:</span>
-                  <span className="text-zinc-300 break-all">{v}</span>
-                </div>
-              ))}
-            </div>
-          }
-          right={
-            <div className="h-full">
-              {respBody ? (
-                <CodeBlock code={respBody} language={respIsJson ? 'json' : 'markup'} className="h-full rounded-none" />
-              ) : (
-                <div className="p-4 text-zinc-600 text-xs">No body</div>
-              )}
-            </div>
-          }
-        />
-      )}
-    </div>
-  )
-
-  const [mode, setMode] = useState<'repeater' | 'race'>('repeater')
-
-  return (
-    <div className="flex flex-col flex-1 overflow-hidden">
-      {/* Sub-tab toggle */}
-      <div className="flex border-b border-bg-border bg-bg-surface shrink-0">
-        {(['repeater', 'race'] as const).map((m) => (
-          <button
-            key={m}
-            onClick={() => setMode(m)}
-            className={clsx(
-              'flex items-center gap-1.5 px-4 py-1.5 text-xs font-medium capitalize transition-colors',
-              mode === m ? 'text-zinc-200 border-b-2 border-accent' : 'text-zinc-500 hover:text-zinc-300'
-            )}
-          >
-            {m === 'race' && <Zap size={11} className="text-red-400" />}
-            {m === 'repeater' ? 'Repeater' : 'Race Conditions'}
-          </button>
-        ))}
-      </div>
-
-      {mode === 'repeater' && (
-        <SplitPane
-          direction="vertical"
-          defaultSplit={50}
-          className="flex-1"
-          left={requestEditor}
-          right={responsePanel}
-        />
-      )}
-      {mode === 'race' && (
-        <RacePanel tab={tab} onChange={onChange} />
-      )}
-    </div>
-  )
-}
