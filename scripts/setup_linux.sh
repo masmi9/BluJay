@@ -1,6 +1,17 @@
 #!/usr/bin/env bash
 # Downloads apktool, jadx, and Android platform-tools (adb) into tools/
+# Supports Linux and macOS.
 set -euo pipefail
+
+OS="$(uname -s)"
+case "$OS" in
+  Darwin) PLATFORM="darwin" ;;
+  Linux)  PLATFORM="linux"  ;;
+  *)
+    echo "Unsupported OS: $OS" >&2
+    exit 1
+    ;;
+esac
 
 TOOLS_DIR="$(cd "$(dirname "$0")/.." && pwd)/tools"
 mkdir -p "$TOOLS_DIR"
@@ -39,7 +50,7 @@ PLATFORM_TOOLS_DIR="$TOOLS_DIR/platform-tools"
 if [ ! -d "$PLATFORM_TOOLS_DIR" ]; then
   echo "Downloading Android platform-tools..."
   TMP=$(mktemp -d)
-  curl -L "https://dl.google.com/android/repository/platform-tools-latest-linux.zip" -o "$TMP/pt.zip"
+  curl -L "https://dl.google.com/android/repository/platform-tools-latest-${PLATFORM}.zip" -o "$TMP/pt.zip"
   unzip -q "$TMP/pt.zip" -d "$TOOLS_DIR"
   chmod +x "$PLATFORM_TOOLS_DIR/adb"
   rm -rf "$TMP"

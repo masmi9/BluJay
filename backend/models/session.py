@@ -52,6 +52,7 @@ class ProxyFlow(Base):
     tls: Mapped[bool] = mapped_column(default=False)
     content_type: Mapped[str | None]
     duration_ms: Mapped[float | None]
+    traffic_type: Mapped[str | None]  # "web" | "mobile" | "ai_llm" | "subsystem" | "unknown"
 
     session: Mapped["DynamicSession"] = relationship(back_populates="proxy_flows")
 

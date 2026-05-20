@@ -6,12 +6,14 @@ interface ProxyStore {
   selectedFlowId: string | null
   sessionId: number | null
   isRunning: boolean
+  activeTypeFilter: string | null
   addFlow: (flow: ProxyFlow) => void
   setFlows: (flows: ProxyFlow[]) => void
   selectFlow: (id: string | null) => void
   setSessionId: (id: number | null) => void
   setIsRunning: (v: boolean) => void
   clearFlows: () => void
+  setTypeFilter: (t: string | null) => void
 }
 
 export const useProxyStore = create<ProxyStore>((set) => ({
@@ -19,10 +21,12 @@ export const useProxyStore = create<ProxyStore>((set) => ({
   selectedFlowId: null,
   sessionId: null,
   isRunning: false,
+  activeTypeFilter: null,
   addFlow: (flow) => set((s) => ({ flows: [flow, ...s.flows].slice(0, 5000) })),
   setFlows: (flows) => set({ flows }),
   selectFlow: (id) => set({ selectedFlowId: id }),
   setSessionId: (id) => set({ sessionId: id }),
   setIsRunning: (v) => set({ isRunning: v }),
   clearFlows: () => set({ flows: [], selectedFlowId: null }),
+  setTypeFilter: (t) => set({ activeTypeFilter: t }),
 }))

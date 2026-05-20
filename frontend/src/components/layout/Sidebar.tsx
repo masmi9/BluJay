@@ -6,7 +6,7 @@ const NAV = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/proxy', icon: Radio, label: 'Proxy' },
   { to: '/repeater', icon: ArrowLeftRight, label: 'Repeater' },
-  { to: '/api-scanner', icon: ShieldAlert, label: 'API + Scanner' },
+  { to: '/scanner', icon: ShieldAlert, label: 'Scanner' },
   { to: '/ctf', icon: Flag, label: 'CTF Mode' },
   { to: '/auth-tester', icon: KeyRound, label: 'Auth & Session Tester' },
   { to: '/vuln-intel', icon: AlertOctagon, label: 'Vulnerability Intelligence' },

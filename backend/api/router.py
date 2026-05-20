@@ -39,6 +39,7 @@ from api.auth_tester import router as auth_tester_router
 from api.vuln_intel import router as vuln_intel_router
 from api.cloud_tester import router as cloud_tester_router
 from api.protocol_tester import router as protocol_tester_router
+from api.ai_agent import router as ai_agent_router
 
 api_router = APIRouter()
 api_router.include_router(analysis_router, prefix="/analyses", tags=["analysis"])
@@ -80,6 +81,7 @@ api_router.include_router(auth_tester_router, prefix="/auth", tags=["auth-tester
 api_router.include_router(vuln_intel_router, prefix="/vuln", tags=["vuln-intel"])
 api_router.include_router(cloud_tester_router, prefix="/cloud", tags=["cloud-tester"])
 api_router.include_router(protocol_tester_router, prefix="/protocol", tags=["protocol-tester"])
+api_router.include_router(ai_agent_router, prefix="/ai-agents", tags=["ai-agents"])
 
 # Singletons initialised lazily (so imports don't fail before lifespan runs)
 _proxy_manager = None

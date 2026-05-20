@@ -262,7 +262,7 @@ function StrixPanel({ scan }: { scan: CTFScan }) {
             <p className="text-[10px] text-zinc-500">Strix scan #{sid} — deep mode</p>
           </div>
           <a
-            href="/api-scanner"
+            href="/scanner"
             className="text-[10px] text-accent border border-accent/30 rounded px-2 py-0.5 hover:bg-accent/10 transition-colors shrink-0"
           >
             View →

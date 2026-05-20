@@ -49,7 +49,7 @@ export default function App() {
               <Route path="/diff" element={<DiffPage />} />
               <Route path="/campaigns" element={<CampaignPage />} />
               <Route path="/checklist" element={<ChecklistPage />} />
-              <Route path="/api-scanner" element={<ApiScannerPage />} />
+              <Route path="/scanner" element={<ApiScannerPage />} />
               <Route path="/ai-triage" element={<AiTriagePage />} />
               <Route path="/pci" element={<PciTestPage />} />
               <Route path="/ctf" element={<CTFPage />} />
@@ -59,11 +59,11 @@ export default function App() {
               <Route path="/cloud-tester" element={<CloudTesterPage />} />
               <Route path="/protocol-tester" element={<ProtocolTesterPage />} />
               {/* Legacy redirects */}
-              <Route path="/scanner" element={<Navigate to="/api-scanner" replace />} />
-              <Route path="/api-testing" element={<Navigate to="/api-scanner" replace />} />
-              <Route path="/fuzzing" element={<Navigate to="/api-scanner" replace />} />
-              <Route path="/brute-force" element={<Navigate to="/api-scanner" replace />} />
-              <Route path="/strix" element={<Navigate to="/api-scanner" replace />} />
+              <Route path="/api-scanner" element={<Navigate to="/scanner" replace />} />
+              <Route path="/api-testing" element={<Navigate to="/scanner" replace />} />
+              <Route path="/fuzzing" element={<Navigate to="/scanner" replace />} />
+              <Route path="/brute-force" element={<Navigate to="/scanner" replace />} />
+              <Route path="/strix" element={<Navigate to="/scanner" replace />} />
               <Route path="/tls" element={<Navigate to="/protocol-tester" replace />} />
               <Route path="/jwt" element={<Navigate to="/auth-tester" replace />} />
               <Route path="/decode" element={<Navigate to="/ai-triage" replace />} />

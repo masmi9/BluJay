@@ -17,7 +17,7 @@ import type { ProxyFlow, ProxyFlowDetail } from '@/types/proxy'
 import type { IosDeviceInfo } from '@/types/adb'
 
 export default function ProxyPage() {
-  const { flows, selectedFlowId, selectFlow, sessionId, setSessionId, clearFlows, isRunning: running, setIsRunning: setRunning } = useProxyStore()
+  const { flows, selectedFlowId, selectFlow, sessionId, setSessionId, clearFlows, isRunning: running, setIsRunning: setRunning, activeTypeFilter, setTypeFilter } = useProxyStore()
   const { activeSession, devices } = useDeviceStore()
   const navigate = useNavigate()
   const [configuring, setConfiguring] = useState(false)
@@ -118,7 +118,7 @@ export default function ProxyPage() {
     try {
       const result = await proxyApi.configureDevice(connectedSerial, androidIp, proxyPort)
       if (result.cert?.pushed) {
-        showStatus(true, `Proxy set to ${androidIp}:${proxyPort}. Cert pushed to ${result.cert.remote_path} â€” install via Settings â†’ Security â†’ Install certificate â†’ CA certificate.`)
+        showStatus(true, `Proxy set to ${androidIp}:${proxyPort}. Cert pushed to ${result.cert.remote_path} â€" install via Settings â†’ Security â†’ Install certificate â†’ CA certificate.`)
       } else {
         showStatus(true, `Proxy set to ${androidIp}:${proxyPort}.`)
       }
@@ -239,7 +239,7 @@ export default function ProxyPage() {
           {blockedHosts.length > 0 && <span>{blockedHosts.length}</span>}
         </button>
 
-        <span className="text-xs text-zinc-500">{flows.length} requests</span>
+        <TrafficTypeStats flows={flows} activeFilter={activeTypeFilter} onFilter={setTypeFilter} />
 
         <a href="/api/v1/proxy/cert" download="mitmproxy-ca-cert.pem"
           className="flex items-center gap-1 px-2 py-1 text-xs text-zinc-400 hover:text-zinc-200 rounded hover:bg-bg-elevated">
@@ -303,7 +303,11 @@ export default function ProxyPage() {
         defaultSplit={45}
         className="flex-1"
         left={<FlowTable
-          flows={blockedHosts.length > 0 ? flows.filter((f) => !blockedHosts.some((b) => f.host?.includes(b))) : flows}
+          flows={flows.filter((f) => {
+            if (blockedHosts.length > 0 && blockedHosts.some((b) => f.host?.includes(b))) return false
+            if (activeTypeFilter && f.traffic_type !== activeTypeFilter) return false
+            return true
+          })}
           selectedId={selectedFlowId}
           onSelect={selectFlow}
         />}
@@ -318,7 +322,7 @@ export default function ProxyPage() {
   )
 }
 
-// â”€â”€â”€ iOS setup panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€â"€ iOS setup panel â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false)
@@ -367,9 +371,9 @@ function IosSetupPanel({ iosDevices, localIp, allIps, proxyPort, proxyRunning, o
       if (detail) {
         setCertServerError(`${detail}`)
       } else if (status) {
-        setCertServerError(`Server returned ${status} â€” check the backend console`)
+        setCertServerError(`Server returned ${status} â€" check the backend console`)
       } else {
-        setCertServerError(e?.message ?? 'Request failed â€” is the backend running?')
+        setCertServerError(e?.message ?? 'Request failed â€" is the backend running?')
       }
     }
   }
@@ -417,7 +421,7 @@ function IosSetupPanel({ iosDevices, localIp, allIps, proxyPort, proxyRunning, o
               <>
                 {!proxyRunning && (
                   <div className="bg-yellow-500/10 border border-yellow-500/20 rounded px-2 py-1.5">
-                    <p className="text-xs text-yellow-400">âš  Start the proxy first â€” the CA cert is generated when mitmproxy starts.</p>
+                    <p className="text-xs text-yellow-400">âš  Start the proxy first â€" the CA cert is generated when mitmproxy starts.</p>
                   </div>
                 )}
                 <p className="text-xs text-zinc-500">
@@ -536,7 +540,7 @@ function IosSetupPanel({ iosDevices, localIp, allIps, proxyPort, proxyRunning, o
             </p>
             {anyJailbroken && (
               <p className="text-xs text-yellow-500/80">
-                âš¡ Jailbroken device detected â€” Frida should attach without issues.
+                âš¡ Jailbroken device detected â€" Frida should attach without issues.
               </p>
             )}
           </div>
@@ -547,7 +551,67 @@ function IosSetupPanel({ iosDevices, localIp, allIps, proxyPort, proxyRunning, o
   )
 }
 
-// â”€â”€â”€ Flow table â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Traffic type helpers ────────────────────────────────────────────────────
+
+const TRAFFIC_TYPE_META: Record<string, { label: string; color: string }> = {
+  ai_llm:    { label: 'AI LLM',   color: 'text-purple-400 bg-purple-500/10 border-purple-500/20' },
+  mobile:    { label: 'Mobile',   color: 'text-green-400 bg-green-500/10 border-green-500/20' },
+  web:       { label: 'Web',      color: 'text-blue-400 bg-blue-500/10 border-blue-500/20' },
+  subsystem: { label: 'Subsystem',color: 'text-orange-400 bg-orange-500/10 border-orange-500/20' },
+  unknown:   { label: 'Unknown',  color: 'text-zinc-500 bg-zinc-700/20 border-zinc-600/20' },
+}
+
+function TrafficTypeBadge({ type }: { type?: string }) {
+  if (!type) return null
+  const meta = TRAFFIC_TYPE_META[type] ?? TRAFFIC_TYPE_META.unknown
+  return (
+    <span className={clsx('px-1.5 py-0.5 rounded text-[10px] font-semibold border', meta.color)}>
+      {meta.label}
+    </span>
+  )
+}
+
+function TrafficTypeStats({ flows, activeFilter, onFilter }: {
+  flows: ProxyFlow[]
+  activeFilter: string | null
+  onFilter: (t: string | null) => void
+}) {
+  const counts: Record<string, number> = {}
+  for (const f of flows) {
+    const t = f.traffic_type ?? 'unknown'
+    counts[t] = (counts[t] ?? 0) + 1
+  }
+  const types = ['ai_llm', 'mobile', 'web', 'subsystem', 'unknown'].filter((t) => (counts[t] ?? 0) > 0)
+
+  return (
+    <div className="flex items-center gap-1 flex-wrap">
+      <button
+        onClick={() => onFilter(null)}
+        className={clsx('px-2 py-0.5 rounded text-xs transition-colors',
+          activeFilter === null ? 'bg-zinc-600/40 text-zinc-200' : 'text-zinc-500 hover:text-zinc-300 hover:bg-bg-elevated')}
+      >
+        All {flows.length}
+      </button>
+      {types.map((t) => {
+        const meta = TRAFFIC_TYPE_META[t]
+        return (
+          <button
+            key={t}
+            onClick={() => onFilter(activeFilter === t ? null : t)}
+            className={clsx(
+              'px-2 py-0.5 rounded text-[10px] font-semibold border transition-colors',
+              activeFilter === t ? meta.color : 'text-zinc-500 border-transparent hover:bg-bg-elevated hover:text-zinc-300'
+            )}
+          >
+            {meta.label} {counts[t]}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+// ── Flow table ──────────────────────────────────────────────────────────────
 
 type DisplayFlow = ProxyFlow & { _count: number }
 
@@ -583,6 +647,7 @@ function FlowTable({ flows, selectedId, onSelect }: {
       <div className="flex text-xs text-zinc-600 px-3 py-1.5 border-b border-bg-border bg-bg-surface font-mono">
         <span className="w-6 mr-2">#</span>
         <span className="w-20">Method</span>
+        <span className="w-20">Type</span>
         <span className="w-32">Host</span>
         <span className="flex-1">Path</span>
         <span className="w-12 text-right">Status</span>
@@ -607,8 +672,11 @@ function FlowTable({ flows, selectedId, onSelect }: {
                 <span className="w-20 flex items-center gap-1.5">
                   <Badge variant="method" value={flow.method} />
                   {flow._count > 1 && (
-                    <span className="text-[10px] text-zinc-500 font-mono">Ã—{flow._count}</span>
+                    <span className="text-[10px] text-zinc-500 font-mono">×{flow._count}</span>
                   )}
+                </span>
+                <span className="w-20">
+                  <TrafficTypeBadge type={flow.traffic_type} />
                 </span>
                 <span className="w-32 text-zinc-400 truncate">{flow.host}</span>
                 <span className="flex-1 text-zinc-300 truncate">{flow.path}</span>
@@ -627,7 +695,7 @@ function FlowTable({ flows, selectedId, onSelect }: {
   )
 }
 
-// â”€â”€â”€ Flow detail panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€â"€ Flow detail panel â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
 function parseBody(raw: string | null | undefined, headers: Record<string, string>, fallbackContentType?: string) {
   if (!raw) return { display: '', isJson: false }

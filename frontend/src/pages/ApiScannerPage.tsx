@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { clsx } from 'clsx'
-import { ShieldAlert, TestTube2, KeyRound, Radar, Wrench, Globe, Workflow, Search } from 'lucide-react'
+import { ShieldAlert, TestTube2, KeyRound, Radar, Wrench, Globe, Workflow, Search, Bot } from 'lucide-react'
+import AIAgentPage from '@/pages/AIAgentPage'
 import ScannerPage from '@/pages/ScannerPage'
 import ApiTesting from '@/pages/ApiTesting'
 import BruteForcePage from '@/pages/BruteForcePage'
@@ -13,7 +14,8 @@ import ReconPage from '@/pages/ReconPage'
 const STORAGE_KEY = 'api-scanner-active-tab'
 
 const TABS = [
-  { id: 'scanner',   label: 'Scanner',      icon: ShieldAlert },
+  { id: 'ai-agents', label: 'AI Agents',    icon: Bot },
+  { id: 'scanner',   label: 'API Scanner',  icon: ShieldAlert },
   { id: 'api',       label: 'API Testing',  icon: TestTube2 },
   { id: 'brute',     label: 'Brute Force',  icon: KeyRound },
   { id: 'ws',        label: 'WebSocket',    icon: Workflow },
@@ -29,7 +31,7 @@ export default function ApiScannerPage() {
   const [active, setActive] = useState<TabId>(() => {
     const stored = localStorage.getItem(STORAGE_KEY)
     const validIds = TABS.map((t) => t.id) as string[]
-    return validIds.includes(stored ?? '') ? (stored as TabId) : 'scanner'
+    return validIds.includes(stored ?? '') ? (stored as TabId) : 'ai-agents'
   })
 
   const switchTab = (id: TabId) => {
@@ -59,6 +61,9 @@ export default function ApiScannerPage() {
       </div>
 
       {/* Page content — keep all mounted so state is preserved */}
+      <div className={clsx('flex-1 overflow-hidden', active !== 'ai-agents' && 'hidden')}>
+        <AIAgentPage />
+      </div>
       <div className={clsx('flex-1 overflow-auto', active !== 'scanner' && 'hidden')}>
         <ScannerPage />
       </div>

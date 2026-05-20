@@ -12,6 +12,7 @@ export interface ProxyFlow {
   tls: boolean
   content_type: string | null
   duration_ms: number | null
+  traffic_type?: 'web' | 'mobile' | 'ai_llm' | 'subsystem' | 'unknown'
 }
 
 export interface ProxyFlowDetail extends ProxyFlow {

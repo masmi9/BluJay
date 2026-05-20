@@ -58,6 +58,15 @@ async def internal_flow(data: dict, db: AsyncSession = Depends(get_db)):
     req_headers = data.get("request_headers", {})
     resp_headers = data.get("response_headers", {})
 
+    from core.traffic_classifier import classify_flow
+    traffic_type = classify_flow(
+        host=data.get("host", ""),
+        path=data.get("path", ""),
+        request_headers=req_headers if isinstance(req_headers, dict) else {},
+        request_body=data.get("request_body"),
+        url=data.get("url"),
+    )
+
     pf = ProxyFlow(
         id=data["id"],
         session_id=session_id,
@@ -74,6 +83,7 @@ async def internal_flow(data: dict, db: AsyncSession = Depends(get_db)):
         tls=data.get("tls", False),
         content_type=data.get("content_type"),
         duration_ms=data.get("duration_ms"),
+        traffic_type=traffic_type,
     )
 
     try:
@@ -82,8 +92,9 @@ async def internal_flow(data: dict, db: AsyncSession = Depends(get_db)):
     except Exception:
         await db.rollback()
 
-    # Fan out to WebSocket subscribers
+    # Fan out to WebSocket subscribers (include classified traffic_type)
     summary = {k: v for k, v in data.items() if k not in ("request_body", "response_body")}
+    summary["traffic_type"] = traffic_type
     get_proxy_manager().push_flow(session_id, summary)
 
     # Run passive scanner in background (non-blocking)
