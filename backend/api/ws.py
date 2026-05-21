@@ -250,3 +250,41 @@ async def ws_owasp_progress(ws: WebSocket, scan_id: int):
         await ws.close()
         return
     await _ws_send_loop(ws, queue)
+
+
+# --- LangGraph pipeline events ---
+
+@ws_router.websocket("/pipeline/{run_id}")
+async def ws_pipeline(ws: WebSocket, run_id: str):
+    await ws.accept()
+    from api.pipeline import get_pipeline_queue
+    queue = None
+    for _ in range(20):
+        queue = get_pipeline_queue(run_id)
+        if queue:
+            break
+        await asyncio.sleep(0.25)
+    if queue is None:
+        await ws.send_text(json.dumps({"type": "error", "message": "Pipeline run not found"}))
+        await ws.close()
+        return
+    await _ws_send_loop(ws, queue)
+
+
+# --- Perf test (k6) progress ---
+
+@ws_router.websocket("/perf/{job_id}")
+async def ws_perf(ws: WebSocket, job_id: str):
+    await ws.accept()
+    from api.perf import get_perf_queue
+    queue = None
+    for _ in range(20):
+        queue = get_perf_queue(job_id)
+        if queue:
+            break
+        await asyncio.sleep(0.25)
+    if queue is None:
+        await ws.send_text(json.dumps({"type": "error", "message": "Perf job not found"}))
+        await ws.close()
+        return
+    await _ws_send_loop(ws, queue)

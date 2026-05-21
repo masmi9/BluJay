@@ -1,6 +1,6 @@
-version: "3.9"
-
 services:
+
+  # ── BluJay FastAPI backend ────────────────────────────────────────────────
   app:
     build:
       context: ..
@@ -10,11 +10,51 @@ services:
     volumes:
       - apkanalysis_data:/root/.apkanalysis
     environment:
-      # ADB server running on the host — container connects to it
       - ADB_SERVER_SOCKET=tcp:host-gateway:5037
     extra_hosts:
       - "host-gateway:host-gateway"
+    networks:
+      - blujay
     restart: unless-stopped
+
+  # ── n8n workflow orchestration (Layer 1) ─────────────────────────────────
+  # UI: http://localhost:5678  (admin / blujay — change in production)
+  # BluJay base URL inside n8n workflows: http://app:8000/api/v1
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      # Basic auth
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=${N8N_ADMIN_USER:-admin}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_ADMIN_PASSWORD:-blujay}
+      # Host / URL config
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - WEBHOOK_URL=http://localhost:5678/
+      # Timezone
+      - GENERIC_TIMEZONE=${TZ:-America/New_York}
+      # BluJay base URL passed to workflow HTTP nodes via env
+      - BLUJAY_BASE_URL=http://app:8000/api/v1
+      # Optional: wire in Anthropic key so n8n workflow AI nodes can call Claude
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      # Disable telemetry
+      - N8N_DIAGNOSTICS_ENABLED=false
+      - N8N_VERSION_NOTIFICATIONS_ENABLED=false
+    volumes:
+      - n8n_data:/home/node/.n8n
+    networks:
+      - blujay
+    depends_on:
+      - app
+
+networks:
+  blujay:
+    driver: bridge
 
 volumes:
   apkanalysis_data:
+  n8n_data:
