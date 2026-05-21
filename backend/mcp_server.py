@@ -5,6 +5,9 @@ Exposes the BluJay mobile security database as an MCP tool-server so that
 Claude (or any MCP-compatible client) can query analyses, findings, CVEs,
 TLS audits, and more without writing raw SQL.
 
+Also exposes action tools that trigger scans, pipeline runs, and perf tests
+against the running BluJay FastAPI backend (localhost:8000).
+
 Run standalone:
     cd backend
     python mcp_server.py
@@ -16,6 +19,7 @@ asyncio complexity in the MCP tool handlers.
 """
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -27,6 +31,7 @@ from config import settings
 # Resolve a synchronous SQLite URL from the same DB path the app uses.
 _SYNC_URL = str(settings.db_url).replace("sqlite+aiosqlite", "sqlite+pysqlite")
 
+import httpx
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
@@ -35,13 +40,17 @@ _Session = sessionmaker(bind=_engine)
 
 from mcp.server.fastmcp import FastMCP
 
+_API_BASE = os.getenv("BLUJAY_API_BASE", "http://localhost:8000/api/v1")
+
 mcp = FastMCP(
     "BluJay",
     instructions=(
-        "BluJay is a mobile security analysis platform. "
-        "Use these tools to inspect Android/iOS APK/IPA analyses, "
-        "static findings, CVE matches, TLS audits, JWT tests, "
-        "campaigns, and analysis diffs."
+        "BluJay is an autonomous AppSec platform. "
+        "Use the query tools to inspect analyses, findings, CVEs, TLS audits, "
+        "JWT tests, campaigns, and diffs. "
+        "Use the action tools to start pipeline runs, trigger web/API scans, "
+        "run performance tests, and launch Strix autonomous pentests. "
+        "Always check run/job status after starting an action."
     ),
 )
 
@@ -269,6 +278,159 @@ def search_findings(keyword: str, limit: int = 50) -> list[dict]:
         "LIMIT :limit",
         {"kw": f"%{keyword}%", "limit": limit},
     )
+
+
+# ── action tools — trigger scans and pipelines ────────────────────────────────
+
+def _post(path: str, body: dict) -> dict:
+    """POST to the BluJay REST API and return the JSON response."""
+    try:
+        r = httpx.post(f"{_API_BASE}{path}", json=body, timeout=30)
+        r.raise_for_status()
+        return r.json()
+    except httpx.HTTPStatusError as exc:
+        return {"error": f"HTTP {exc.response.status_code}", "detail": exc.response.text}
+    except httpx.RequestError as exc:
+        return {"error": "connection_failed", "detail": str(exc)}
+
+
+def _get(path: str, params: dict | None = None) -> dict | list:
+    """GET from the BluJay REST API and return the JSON response."""
+    try:
+        r = httpx.get(f"{_API_BASE}{path}", params=params, timeout=15)
+        r.raise_for_status()
+        return r.json()
+    except httpx.HTTPStatusError as exc:
+        return {"error": f"HTTP {exc.response.status_code}", "detail": exc.response.text}
+    except httpx.RequestError as exc:
+        return {"error": "connection_failed", "detail": str(exc)}
+
+
+@mcp.tool()
+def start_pipeline(target_url: str, scan_type: str = "web") -> dict:
+    """
+    Start an autonomous LangGraph pentest pipeline against a URL.
+
+    The pipeline runs: Recon → Exploit (with variant loop) → Human Gate →
+    PoC Validation → Report.
+
+    scan_type: 'web' | 'api'
+
+    Returns a run_id. Use get_pipeline_run(run_id) to poll status.
+    When the pipeline reaches the Human Gate it pauses — use
+    resume_pipeline(run_id, decision) to approve or deny.
+    """
+    return _post("/pipeline/run", {"target_url": target_url, "scan_type": scan_type})
+
+
+@mcp.tool()
+def get_pipeline_run(run_id: str) -> dict:
+    """
+    Get the current status and results of a pipeline run.
+
+    Status values: running | awaiting_review | completed | denied | failed
+
+    When status is 'awaiting_review', gate_payload contains the finding
+    summary that needs human approval before PoC validation proceeds.
+    """
+    return _get(f"/pipeline/{run_id}")
+
+
+@mcp.tool()
+def resume_pipeline(run_id: str, decision: str) -> dict:
+    """
+    Resume a pipeline run that is paused at the Human Review Gate.
+
+    decision: 'approved' — continue to PoC validation and report
+              'denied'   — stop the pipeline immediately
+
+    Only valid when get_pipeline_run shows status='awaiting_review'.
+    """
+    return _post(f"/pipeline/{run_id}/resume", {"decision": decision})
+
+
+@mcp.tool()
+def run_web_scan(
+    target_url: str,
+    scan_types: list[str] | None = None,
+) -> dict:
+    """
+    Run the BluJay active web scanner against a URL.
+
+    Detects: XSS, SQLi, SSRF, path traversal, open redirect.
+
+    scan_types: list of checks to run, e.g. ['xss', 'sqli', 'ssrf'].
+    Leave None to run all checks.
+
+    Returns a scan result dict with findings keyed by type.
+    """
+    body: dict = {"target_url": target_url}
+    if scan_types:
+        body["scan_types"] = scan_types
+    return _post("/scanner/active", body)
+
+
+@mcp.tool()
+def run_perf_test(
+    target_url: str,
+    finding_type: str,
+    vus: int = 10,
+    duration: str = "30s",
+) -> dict:
+    """
+    Trigger a k6 performance / load test informed by a security finding.
+
+    finding_type maps to a test script:
+      race_condition  → concurrent load, state mutation under pressure
+      auth_endpoint   → brute-force rate limit, lockout threshold detection
+      idor_found      → enumeration load, ID range sweep at scale
+      api_endpoint    → spike test, DoS viability assessment
+      slow_response   → stress test, timing-based vulnerability confirmation
+
+    vus: virtual users (default 10)
+    duration: k6 duration string, e.g. '30s', '2m' (default '30s')
+
+    Returns a job_id. Poll GET /perf/{job_id} for status and metrics.
+    """
+    return _post("/perf/run", {
+        "target_url": target_url,
+        "finding_type": finding_type,
+        "vus": vus,
+        "duration": duration,
+    })
+
+
+@mcp.tool()
+def get_perf_job(job_id: str) -> dict:
+    """
+    Get the status and output metrics for a running or completed k6 perf job.
+
+    Metrics include p95/p99 latency, requests/sec, error rate, and rate-limit
+    threshold detection where applicable.
+    """
+    return _get(f"/perf/{job_id}")
+
+
+@mcp.tool()
+def start_strix(
+    target_url: str,
+    session_id: int | None = None,
+) -> dict:
+    """
+    Launch Strix — BluJay's multi-agent autonomous pentest coordinator.
+
+    Strix orchestrates a full pentest lifecycle: recon, exploit, PoC
+    confirmation, and report generation in a Docker-sandboxed environment.
+    Uses Claude for exploit reasoning and Ollama for routine tasks.
+
+    session_id: optionally link to an existing dynamic analysis session.
+
+    Returns a strix_run_id for tracking.
+    """
+    body: dict = {"target_url": target_url}
+    if session_id is not None:
+        body["session_id"] = session_id
+    return _post("/strix/start", body)
 
 
 # ── entry point ───────────────────────────────────────────────────────────────
