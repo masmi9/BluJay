@@ -1,0 +1,217 @@
+{
+  "name": "BluJay — Slack Command Router",
+  "nodes": [
+    {
+      "id": "slack-cmd-001",
+      "name": "Slack Slash Command",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "webhookId": "blujay-slack-command",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "blujay/slack-command",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "slack-cmd-002",
+      "name": "Ack Slack",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [460, 180],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"text\": \"⏳ BluJay scan queued for `\" + $json.text + \"` — results incoming.\", \"response_type\": \"ephemeral\" }"
+      }
+    },
+    {
+      "id": "slack-cmd-003",
+      "name": "Parse Command",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [460, 380],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "command",
+              "name": "command",
+              "value": "={{ $json.command?.replace('/', '') || 'scan' }}",
+              "type": "string"
+            },
+            {
+              "id": "target",
+              "name": "target",
+              "value": "={{ $json.text?.trim() || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "user",
+              "name": "user",
+              "value": "={{ $json.user_name || $json.user_id }}",
+              "type": "string"
+            },
+            {
+              "id": "channel_id",
+              "name": "channel_id",
+              "value": "={{ $json.channel_id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "slack-cmd-004",
+      "name": "Route by Command",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [680, 380],
+      "parameters": {
+        "mode": "rules",
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": { "caseSensitive": false },
+                "conditions": [
+                  { "leftValue": "={{ $json.command }}", "rightValue": "scan", "operator": { "type": "string", "operation": "equals" } }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "scan"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": false },
+                "conditions": [
+                  { "leftValue": "={{ $json.command }}", "rightValue": "pentest", "operator": { "type": "string", "operation": "equals" } }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "pentest"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": false },
+                "conditions": [
+                  { "leftValue": "={{ $json.command }}", "rightValue": "perf", "operator": { "type": "string", "operation": "equals" } }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "perf"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "slack-cmd-005",
+      "name": "Run Web Scanner",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [900, 200],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.BLUJAY_BASE_URL || 'http://app:8000/api/v1' }}/scanner/active",
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={ \"url\": \"{{ $('Parse Command').item.json.target }}\", \"checks\": [\"xss\",\"sqli\",\"ssrf\",\"idor\",\"open_redirect\"] }",
+        "options": {}
+      }
+    },
+    {
+      "id": "slack-cmd-006",
+      "name": "Run LangGraph Pipeline",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [900, 380],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.BLUJAY_BASE_URL || 'http://app:8000/api/v1' }}/pipeline/run",
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={ \"target_url\": \"{{ $('Parse Command').item.json.target }}\", \"scan_type\": \"api\" }",
+        "options": {}
+      }
+    },
+    {
+      "id": "slack-cmd-007",
+      "name": "Run Perf Test",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [900, 560],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.BLUJAY_BASE_URL || 'http://app:8000/api/v1' }}/perf/run",
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={ \"target_url\": \"{{ $('Parse Command').item.json.target }}\", \"finding_type\": \"api_endpoint\", \"vus\": 20, \"duration\": \"30s\" }",
+        "options": {}
+      }
+    },
+    {
+      "id": "slack-cmd-008",
+      "name": "Slack — Scan Result",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2,
+      "position": [1120, 280],
+      "credentials": {
+        "slackApi": { "id": "slack-cred-id", "name": "BluJay Slack" }
+      },
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "channel": {
+          "__rl": true,
+          "value": "={{ $('Parse Command').item.json.channel_id }}",
+          "mode": "id"
+        },
+        "text": "=✅ *Scan queued* for `{{ $('Parse Command').item.json.target }}`\nRequested by @{{ $('Parse Command').item.json.user }} — results will follow via gate notification.",
+        "otherOptions": {}
+      }
+    }
+  ],
+  "connections": {
+    "Slack Slash Command": {
+      "main": [
+        [
+          { "node": "Ack Slack", "type": "main", "index": 0 },
+          { "node": "Parse Command", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Parse Command": {
+      "main": [
+        [{ "node": "Route by Command", "type": "main", "index": 0 }]
+      ]
+    },
+    "Route by Command": {
+      "main": [
+        [{ "node": "Run Web Scanner", "type": "main", "index": 0 }],
+        [{ "node": "Run LangGraph Pipeline", "type": "main", "index": 0 }],
+        [{ "node": "Run Perf Test", "type": "main", "index": 0 }]
+      ]
+    },
+    "Run Web Scanner": {
+      "main": [
+        [{ "node": "Slack — Scan Result", "type": "main", "index": 0 }]
+      ]
+    },
+    "Run LangGraph Pipeline": {
+      "main": [
+        [{ "node": "Slack — Scan Result", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "staticData": null,
+  "tags": [{ "name": "blujay" }, { "name": "layer-1" }, { "name": "slack" }],
+  "id": "blujay-workflow-slack-001"
+}

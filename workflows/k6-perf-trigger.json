@@ -1,0 +1,164 @@
+{
+  "name": "BluJay — Finding → k6 Perf Test",
+  "nodes": [
+    {
+      "id": "k6-trig-001",
+      "name": "Finding Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "webhookId": "blujay-finding-classifier",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "blujay/finding",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "k6-trig-002",
+      "name": "Ack Finding",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [460, 180],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"status\": \"queued\", \"finding_type\": $json.finding_type }"
+      }
+    },
+    {
+      "id": "k6-trig-003",
+      "name": "Severity Gate",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [460, 380],
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "conditions": [
+            {
+              "id": "cond-sev",
+              "leftValue": "={{ $json.severity }}",
+              "rightValue": "low",
+              "operator": { "type": "string", "operation": "notEquals" }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "k6-trig-004",
+      "name": "Map Finding to Test Type",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [680, 300],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "finding_type",
+              "name": "finding_type",
+              "value": "={{ $json.type || $json.finding_type || 'api_endpoint' }}",
+              "type": "string"
+            },
+            {
+              "id": "target_url",
+              "name": "target_url",
+              "value": "={{ $json.endpoint || $json.target_url }}",
+              "type": "string"
+            },
+            {
+              "id": "vus",
+              "name": "vus",
+              "value": "={{ $json.severity === 'critical' ? 50 : $json.severity === 'high' ? 25 : 10 }}",
+              "type": "number"
+            },
+            {
+              "id": "duration",
+              "name": "duration",
+              "value": "={{ $json.severity === 'critical' ? '60s' : '30s' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "k6-trig-005",
+      "name": "POST /perf/run",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [900, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.BLUJAY_BASE_URL || 'http://app:8000/api/v1' }}/perf/run",
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={\n  \"target_url\": \"{{ $json.target_url }}\",\n  \"finding_type\": \"{{ $json.finding_type }}\",\n  \"vus\": {{ $json.vus }},\n  \"duration\": \"{{ $json.duration }}\"\n}",
+        "options": { "timeout": 10000 }
+      }
+    },
+    {
+      "id": "k6-trig-006",
+      "name": "Slack — Perf Test Launched",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2,
+      "position": [1120, 300],
+      "credentials": {
+        "slackApi": { "id": "slack-cred-id", "name": "BluJay Slack" }
+      },
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "channel": {
+          "__rl": true,
+          "value": "={{ $vars.SLACK_SECURITY_CHANNEL || '#security-alerts' }}",
+          "mode": "name"
+        },
+        "text": "=⚡ *k6 perf test launched*\nFinding: `{{ $('Map Finding to Test Type').item.json.finding_type }}`\nTarget: `{{ $('Map Finding to Test Type').item.json.target_url }}`\nVUs: {{ $('Map Finding to Test Type').item.json.vus }} · Duration: {{ $('Map Finding to Test Type').item.json.duration }}\nJob ID: `{{ $json.job_id }}`",
+        "otherOptions": {}
+      }
+    },
+    {
+      "id": "k6-trig-007",
+      "name": "Low Severity — Skip Perf",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [680, 500],
+      "parameters": {}
+    }
+  ],
+  "connections": {
+    "Finding Webhook": {
+      "main": [
+        [
+          { "node": "Ack Finding", "type": "main", "index": 0 },
+          { "node": "Severity Gate", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Severity Gate": {
+      "main": [
+        [{ "node": "Map Finding to Test Type", "type": "main", "index": 0 }],
+        [{ "node": "Low Severity — Skip Perf", "type": "main", "index": 0 }]
+      ]
+    },
+    "Map Finding to Test Type": {
+      "main": [
+        [{ "node": "POST /perf/run", "type": "main", "index": 0 }]
+      ]
+    },
+    "POST /perf/run": {
+      "main": [
+        [{ "node": "Slack — Perf Test Launched", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "staticData": null,
+  "tags": [{ "name": "blujay" }, { "name": "layer-1" }, { "name": "k6" }, { "name": "perf" }],
+  "id": "blujay-workflow-k6-001"
+}

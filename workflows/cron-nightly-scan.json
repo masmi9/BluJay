@@ -1,0 +1,224 @@
+{
+  "name": "BluJay — Nightly Scheduled Scan",
+  "nodes": [
+    {
+      "id": "cron-001",
+      "name": "Nightly Cron",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 2 * * *"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "cron-002",
+      "name": "Set Scan Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [460, 300],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "run_date",
+              "name": "run_date",
+              "value": "={{ $now.toFormat('yyyy-MM-dd') }}",
+              "type": "string"
+            },
+            {
+              "id": "targets",
+              "name": "targets",
+              "value": "={{ $vars.NIGHTLY_SCAN_TARGETS ? $vars.NIGHTLY_SCAN_TARGETS.split(',') : [] }}",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "cron-003",
+      "name": "Split Targets",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [680, 300],
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      }
+    },
+    {
+      "id": "cron-004",
+      "name": "Launch Pipeline per Target",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [900, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.BLUJAY_BASE_URL || 'http://app:8000/api/v1' }}/pipeline/run",
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={ \"target_url\": \"{{ $json }}\", \"scan_type\": \"api\" }",
+        "options": { "timeout": 10000 }
+      }
+    },
+    {
+      "id": "cron-005",
+      "name": "Active Web Scanner",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [900, 460],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.BLUJAY_BASE_URL || 'http://app:8000/api/v1' }}/scanner/active",
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={ \"url\": \"{{ $json }}\", \"checks\": [\"xss\",\"sqli\",\"ssrf\",\"idor\",\"path_traversal\",\"open_redirect\"] }",
+        "options": { "timeout": 60000 }
+      }
+    },
+    {
+      "id": "cron-006",
+      "name": "CVE Intel Check",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [900, 620],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $vars.BLUJAY_BASE_URL || 'http://app:8000/api/v1' }}/vuln/intel",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "package", "value": "all" }
+          ]
+        },
+        "options": { "timeout": 30000 }
+      }
+    },
+    {
+      "id": "cron-007",
+      "name": "Collect Results",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [1120, 460],
+      "parameters": {
+        "mode": "append",
+        "options": {}
+      }
+    },
+    {
+      "id": "cron-008",
+      "name": "Summarise with Ollama",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1340, 460],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $vars.BLUJAY_BASE_URL || 'http://app:8000/api/v1' }}/ollama/triage",
+        "options": { "timeout": 60000 }
+      }
+    },
+    {
+      "id": "cron-009",
+      "name": "Email Nightly Report",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [1560, 460],
+      "credentials": {
+        "smtp": { "id": "smtp-cred-id", "name": "BluJay SMTP" }
+      },
+      "parameters": {
+        "fromEmail": "={{ $vars.REPORT_FROM_EMAIL || 'blujay-noreply@yourdomain.com' }}",
+        "toEmail": "={{ $vars.REPORT_TO_EMAIL || 'security@yourdomain.com' }}",
+        "subject": "=BluJay Nightly Scan Report — {{ $('Set Scan Config').item.json.run_date }}",
+        "emailFormat": "html",
+        "message": "=<h2>BluJay Nightly Scan — {{ $('Set Scan Config').item.json.run_date }}</h2>\n<p>Automated security scan completed across {{ $('Set Scan Config').item.json.targets.length }} targets.</p>\n<pre>{{ JSON.stringify($json, null, 2) }}</pre>",
+        "options": {}
+      }
+    },
+    {
+      "id": "cron-010",
+      "name": "Slack — Nightly Summary",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2,
+      "position": [1560, 620],
+      "credentials": {
+        "slackApi": { "id": "slack-cred-id", "name": "BluJay Slack" }
+      },
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "channel": {
+          "__rl": true,
+          "value": "={{ $vars.SLACK_SECURITY_CHANNEL || '#security-alerts' }}",
+          "mode": "name"
+        },
+        "text": "=🌙 *Nightly scan complete* — {{ $('Set Scan Config').item.json.run_date }}\nTargets scanned: {{ $('Set Scan Config').item.json.targets.length }} — Full report sent to {{ $vars.REPORT_TO_EMAIL }}",
+        "otherOptions": {}
+      }
+    }
+  ],
+  "connections": {
+    "Nightly Cron": {
+      "main": [
+        [{ "node": "Set Scan Config", "type": "main", "index": 0 }]
+      ]
+    },
+    "Set Scan Config": {
+      "main": [
+        [{ "node": "Split Targets", "type": "main", "index": 0 }]
+      ]
+    },
+    "Split Targets": {
+      "main": [
+        [
+          { "node": "Launch Pipeline per Target", "type": "main", "index": 0 },
+          { "node": "Active Web Scanner", "type": "main", "index": 0 },
+          { "node": "CVE Intel Check", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Launch Pipeline per Target": {
+      "main": [
+        [{ "node": "Collect Results", "type": "main", "index": 0 }]
+      ]
+    },
+    "Active Web Scanner": {
+      "main": [
+        [{ "node": "Collect Results", "type": "main", "index": 1 }]
+      ]
+    },
+    "CVE Intel Check": {
+      "main": [
+        [{ "node": "Collect Results", "type": "main", "index": 2 }]
+      ]
+    },
+    "Collect Results": {
+      "main": [
+        [{ "node": "Summarise with Ollama", "type": "main", "index": 0 }]
+      ]
+    },
+    "Summarise with Ollama": {
+      "main": [
+        [
+          { "node": "Email Nightly Report", "type": "main", "index": 0 },
+          { "node": "Slack — Nightly Summary", "type": "main", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "staticData": null,
+  "tags": [{ "name": "blujay" }, { "name": "layer-1" }, { "name": "cron" }],
+  "id": "blujay-workflow-cron-001"
+}

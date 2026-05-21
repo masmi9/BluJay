@@ -1,0 +1,164 @@
+{
+  "name": "BluJay — GitHub Push → Security Scan",
+  "nodes": [
+    {
+      "id": "gh-0001",
+      "name": "GitHub Push Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "webhookId": "blujay-github-push",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "blujay/github-push",
+        "responseMode": "responseNode",
+        "options": {
+          "rawBody": true
+        }
+      }
+    },
+    {
+      "id": "gh-0002",
+      "name": "Ack GitHub",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [460, 200],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \"status\": \"queued\" }"
+      }
+    },
+    {
+      "id": "gh-0003",
+      "name": "Check for APK/IPA Changes",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [460, 380],
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": false },
+          "conditions": [
+            {
+              "id": "cond-apk",
+              "leftValue": "={{ JSON.stringify($json.commits?.map(c => c.modified?.concat(c.added || [])).flat()) }}",
+              "rightValue": ".apk|.ipa|.aab",
+              "operator": { "type": "string", "operation": "regex" }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "gh-0004",
+      "name": "Extract Repo Info",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [680, 300],
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            { "id": "repo", "name": "repo", "value": "={{ $json.repository.full_name }}", "type": "string" },
+            { "id": "branch", "name": "branch", "value": "={{ $json.ref.replace('refs/heads/', '') }}", "type": "string" },
+            { "id": "commit_sha", "name": "commit_sha", "value": "={{ $json.head_commit.id }}", "type": "string" },
+            { "id": "pusher", "name": "pusher", "value": "={{ $json.pusher.name }}", "type": "string" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "gh-0005",
+      "name": "Trigger Strix Pentest",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [900, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.BLUJAY_BASE_URL || 'http://app:8000/api/v1' }}/strix/scan",
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={\n  \"target_url\": \"{{ $vars.TARGET_BASE_URL }}\",\n  \"scan_name\": \"github-{{ $json.commit_sha.substring(0,8) }}\",\n  \"triggered_by\": \"github_push\",\n  \"repo\": \"{{ $json.repo }}\",\n  \"branch\": \"{{ $json.branch }}\"\n}",
+        "options": { "timeout": 5000 }
+      }
+    },
+    {
+      "id": "gh-0006",
+      "name": "Trigger LangGraph Pipeline",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [900, 460],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.BLUJAY_BASE_URL || 'http://app:8000/api/v1' }}/pipeline/run",
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={\n  \"target_url\": \"{{ $vars.TARGET_BASE_URL }}\",\n  \"scan_type\": \"api\"\n}",
+        "options": { "timeout": 5000 }
+      }
+    },
+    {
+      "id": "gh-0007",
+      "name": "Slack — Push Scan Started",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2,
+      "position": [1120, 380],
+      "credentials": {
+        "slackApi": { "id": "slack-cred-id", "name": "BluJay Slack" }
+      },
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "channel": {
+          "__rl": true,
+          "value": "={{ $vars.SLACK_SECURITY_CHANNEL || '#security-alerts' }}",
+          "mode": "name"
+        },
+        "text": "=🔍 *GitHub push scan started*\nRepo: `{{ $('Extract Repo Info').item.json.repo }}`  Branch: `{{ $('Extract Repo Info').item.json.branch }}`  Commit: `{{ $('Extract Repo Info').item.json.commit_sha.substring(0,8) }}`\nPushed by: {{ $('Extract Repo Info').item.json.pusher }}",
+        "otherOptions": {}
+      }
+    },
+    {
+      "id": "gh-0008",
+      "name": "No Mobile Files — Skip",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [680, 500],
+      "parameters": {}
+    }
+  ],
+  "connections": {
+    "GitHub Push Webhook": {
+      "main": [
+        [
+          { "node": "Ack GitHub", "type": "main", "index": 0 },
+          { "node": "Check for APK/IPA Changes", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Check for APK/IPA Changes": {
+      "main": [
+        [{ "node": "Extract Repo Info", "type": "main", "index": 0 }],
+        [{ "node": "No Mobile Files — Skip", "type": "main", "index": 0 }]
+      ]
+    },
+    "Extract Repo Info": {
+      "main": [
+        [
+          { "node": "Trigger Strix Pentest", "type": "main", "index": 0 },
+          { "node": "Trigger LangGraph Pipeline", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Trigger Strix Pentest": {
+      "main": [
+        [{ "node": "Slack — Push Scan Started", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "staticData": null,
+  "tags": [{ "name": "blujay" }, { "name": "layer-1" }, { "name": "github" }],
+  "id": "blujay-workflow-github-001"
+}

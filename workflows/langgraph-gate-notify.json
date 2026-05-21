@@ -1,0 +1,201 @@
+{
+  "name": "BluJay — LangGraph Gate Approval",
+  "nodes": [
+    {
+      "id": "1a2b3c4d-0001-0001-0001-000000000001",
+      "name": "Gate Interrupt Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "webhookId": "blujay-gate-interrupt",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "blujay/gate-interrupt",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "1a2b3c4d-0001-0001-0001-000000000002",
+      "name": "Ack Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [460, 300],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"status\": \"received\", \"run_id\": $json.run_id }"
+      }
+    },
+    {
+      "id": "1a2b3c4d-0001-0001-0001-000000000003",
+      "name": "Build Slack Message",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [680, 300],
+      "parameters": {
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "run_id",
+              "name": "run_id",
+              "value": "={{ $json.run_id }}",
+              "type": "string"
+            },
+            {
+              "id": "blocks",
+              "name": "blocks",
+              "value": "=[\n  {\n    \"type\": \"header\",\n    \"text\": { \"type\": \"plain_text\", \"text\": \"🔍 BluJay — Human Review Gate\" }\n  },\n  {\n    \"type\": \"section\",\n    \"text\": {\n      \"type\": \"mrkdwn\",\n      \"text\": \"*Target:* {{ $json.gate_payload.run_id || $json.run_id }}\\n*Findings:* {{ $json.gate_payload.finding_count }} total · {{ $json.gate_payload.critical_count || 0 }} critical/high\"\n    }\n  },\n  {\n    \"type\": \"section\",\n    \"text\": { \"type\": \"mrkdwn\", \"text\": \"*Summary:*\\n{{ $json.gate_payload.summary || 'See findings for details.' }}\" }\n  },\n  {\n    \"type\": \"actions\",\n    \"elements\": [\n      {\n        \"type\": \"button\",\n        \"text\": { \"type\": \"plain_text\", \"text\": \"✅ Approve\" },\n        \"style\": \"primary\",\n        \"action_id\": \"gate_approve\",\n        \"value\": \"{{ $json.run_id }}\"\n      },\n      {\n        \"type\": \"button\",\n        \"text\": { \"type\": \"plain_text\", \"text\": \"❌ Deny\" },\n        \"style\": \"danger\",\n        \"action_id\": \"gate_deny\",\n        \"value\": \"{{ $json.run_id }}\"\n      }\n    ]\n  }\n]",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "1a2b3c4d-0001-0001-0001-000000000004",
+      "name": "Slack — Post Gate Review",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2,
+      "position": [900, 300],
+      "credentials": {
+        "slackApi": {
+          "id": "slack-cred-id",
+          "name": "BluJay Slack"
+        }
+      },
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "channel": {
+          "__rl": true,
+          "value": "={{ $vars.SLACK_SECURITY_CHANNEL || '#security-alerts' }}",
+          "mode": "name"
+        },
+        "blocksUi": "={{ JSON.stringify($json.blocks) }}",
+        "otherOptions": {}
+      }
+    },
+    {
+      "id": "1a2b3c4d-0001-0001-0001-000000000005",
+      "name": "Slack Action Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 560],
+      "webhookId": "blujay-gate-action",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "blujay/gate-action",
+        "responseMode": "lastNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "1a2b3c4d-0001-0001-0001-000000000006",
+      "name": "Parse Slack Action",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3,
+      "position": [460, 560],
+      "parameters": {
+        "mode": "manual",
+        "duplicateItem": false,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "run_id",
+              "name": "run_id",
+              "value": "={{ $json.payload ? JSON.parse($json.payload).actions[0].value : $json.run_id }}",
+              "type": "string"
+            },
+            {
+              "id": "decision",
+              "name": "decision",
+              "value": "={{ $json.payload ? (JSON.parse($json.payload).actions[0].action_id === 'gate_approve' ? 'approved' : 'denied') : $json.decision }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "1a2b3c4d-0001-0001-0001-000000000007",
+      "name": "Resume LangGraph Pipeline",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [680, 560],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.BLUJAY_BASE_URL || 'http://app:8000/api/v1' }}/pipeline/{{ $json.run_id }}/resume",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "decision", "value": "={{ $json.decision }}" }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "1a2b3c4d-0001-0001-0001-000000000008",
+      "name": "Slack — Confirm Decision",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2,
+      "position": [900, 560],
+      "credentials": {
+        "slackApi": {
+          "id": "slack-cred-id",
+          "name": "BluJay Slack"
+        }
+      },
+      "parameters": {
+        "resource": "message",
+        "operation": "post",
+        "channel": {
+          "__rl": true,
+          "value": "={{ $vars.SLACK_SECURITY_CHANNEL || '#security-alerts' }}",
+          "mode": "name"
+        },
+        "text": "={{ $json.decision === 'approved' ? '✅ Gate approved — PoC validation in progress for run ' + $json.run_id : '❌ Gate denied — pipeline stopped for run ' + $json.run_id }}",
+        "otherOptions": {}
+      }
+    }
+  ],
+  "connections": {
+    "Gate Interrupt Webhook": {
+      "main": [
+        [
+          { "node": "Ack Webhook", "type": "main", "index": 0 },
+          { "node": "Build Slack Message", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Build Slack Message": {
+      "main": [
+        [{ "node": "Slack — Post Gate Review", "type": "main", "index": 0 }]
+      ]
+    },
+    "Slack Action Webhook": {
+      "main": [
+        [{ "node": "Parse Slack Action", "type": "main", "index": 0 }]
+      ]
+    },
+    "Parse Slack Action": {
+      "main": [
+        [{ "node": "Resume LangGraph Pipeline", "type": "main", "index": 0 }]
+      ]
+    },
+    "Resume LangGraph Pipeline": {
+      "main": [
+        [{ "node": "Slack — Confirm Decision", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "staticData": null,
+  "tags": [{ "name": "blujay" }, { "name": "layer-1" }, { "name": "gate" }],
+  "id": "blujay-workflow-gate-001"
+}
