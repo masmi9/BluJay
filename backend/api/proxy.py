@@ -100,6 +100,13 @@ async def internal_flow(data: dict, db: AsyncSession = Depends(get_db)):
     # Run passive scanner in background (non-blocking)
     asyncio.create_task(_run_passive_scan(session_id, pf.id, data))
 
+    # Update live endpoint map (synchronous — fast in-memory op)
+    from api.router import get_endpoint_mapper, get_idor_interceptor
+    get_endpoint_mapper().update(session_id, data)
+
+    # Enqueue for IDOR testing if enabled for this session
+    get_idor_interceptor().enqueue(session_id, data)
+
     return {"ok": True}
 
 
@@ -237,6 +244,9 @@ async def clear_flows(session_id: int = Query(...), db: AsyncSession = Depends(g
     from sqlalchemy import delete
     await db.execute(delete(ProxyFlow).where(ProxyFlow.session_id == session_id))
     await db.commit()
+    from api.router import get_endpoint_mapper, get_idor_interceptor
+    get_endpoint_mapper().clear(session_id)
+    get_idor_interceptor().clear(session_id)
     return {"status": "cleared"}
 
 
@@ -461,4 +471,37 @@ async def unconfigure_device(serial: str):
     from core import adb_manager
     ok = await adb_manager.clear_proxy(serial)
     return {"proxy_cleared": ok}
+
+
+# ── Endpoint Map ──────────────────────────────────────────────────────────────
+
+@router.get("/map")
+async def get_endpoint_map(session_id: int = Query(...)):
+    """Return the live endpoint map for a proxy session."""
+    from api.router import get_endpoint_mapper
+    em = get_endpoint_mapper()
+    return {
+        "session_id": session_id,
+        "stats": em.stats(session_id),
+        "map": em.get_map(session_id),
+    }
+
+
+class FeatureRequest(BaseModel):
+    feature: str | None = None
+
+
+@router.post("/map/feature")
+async def set_endpoint_feature(
+    session_id: int = Query(...),
+    host: str = Query(...),
+    pattern: str = Query(...),
+    body: FeatureRequest = ...,
+):
+    """Annotate an endpoint with a feature/screen label (e.g. 'login', 'profile')."""
+    from api.router import get_endpoint_mapper
+    ok = get_endpoint_mapper().set_feature(session_id, host, pattern, body.feature)
+    if not ok:
+        raise HTTPException(404, "Endpoint not found in map")
+    return {"ok": True}
 

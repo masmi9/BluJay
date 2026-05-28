@@ -965,8 +965,16 @@ Recommendation: Check Frida installation and device connectivity
             if is_large_apk:
                 logger.info(f"Large APK detected ({apk_size_mb:.1f}MB) - using optimized extraction")
 
-            # Configure APKtool command with memory optimization
-            cmd = ["apktool", "d"]
+            # Configure APKtool command with memory optimization.
+            # On Windows, subprocess.run cannot execute .bat files via CreateProcess.
+            # When APKTOOL_JAR is set (by BluJay's owasp_scanner.py) use java -jar
+            # directly, which works on all platforms without shell=True.
+            _apktool_jar = os.environ.get("APKTOOL_JAR", "")
+            _java_bin = os.environ.get("JAVA_PATH", "java")
+            if _apktool_jar and os.path.exists(_apktool_jar):
+                cmd = [_java_bin, "-jar", _apktool_jar, "d"]
+            else:
+                cmd = ["apktool", "d"]
 
             # Memory optimization flags for large APKs (apktool has different flags; harmless for JADX gate)
             if is_large_apk:
