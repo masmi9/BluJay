@@ -17,12 +17,13 @@ WebSocket: /ws/perf/{job_id}
 import asyncio
 import uuid
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Literal
 
 import structlog
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel
 
+from core.locust_runner import run_locust
 from core.perf_runner import run_k6
 
 logger = structlog.get_logger()
@@ -37,16 +38,25 @@ _job_queues: dict[str, asyncio.Queue] = {}
 
 class PerfRunRequest(BaseModel):
     target_url: str
-    finding_type: str           # race_condition | auth_endpoint | idor_found | api_endpoint | slow_response
-    vus: int = 10               # virtual users
-    duration: str = "30s"       # k6 duration string e.g. "30s", "2m"
+    runner: Literal["k6", "locust"] = "k6"
+    # k6 params
+    finding_type: str = "api_endpoint"  # race_condition | auth_endpoint | idor_found | api_endpoint | slow_response
+    vus: int = 10                        # virtual users (k6)
+    duration: str = "30s"               # k6 duration string e.g. "30s", "2m"
+    # locust params
+    scenario: str = "api_sequence"      # multi_user | oauth | jwt | websocket | api_sequence
+    users: int = 10                     # concurrent users (locust)
+    spawn_rate: float = 2.0             # users spawned per second
+    run_time: str = "30s"              # locust run time e.g. "30s", "2m"
     extra_env: dict[str, str] = {}
 
 
 class PerfJobStatus(BaseModel):
     job_id: str
     status: str                 # running | completed | failed
+    runner: str                 # k6 | locust
     finding_type: str
+    scenario: str
     target_url: str
     script: str | None
     started_at: str
@@ -68,7 +78,9 @@ def _job_to_status(job_id: str, job: dict) -> PerfJobStatus:
     return PerfJobStatus(
         job_id=job_id,
         status=job["status"],
-        finding_type=job["finding_type"],
+        runner=job.get("runner", "k6"),
+        finding_type=job.get("finding_type", ""),
+        scenario=job.get("scenario", ""),
         target_url=job["target_url"],
         script=job.get("script"),
         started_at=job["started_at"],
@@ -84,15 +96,27 @@ async def _run_job(job_id: str, req: PerfRunRequest) -> None:
     job = _jobs[job_id]
     queue = _job_queues[job_id]
 
-    await run_k6(
-        job_id=job_id,
-        target_url=req.target_url,
-        finding_type=req.finding_type,
-        queue=queue,
-        vus=req.vus,
-        duration=req.duration,
-        extra_env=req.extra_env,
-    )
+    if req.runner == "locust":
+        await run_locust(
+            job_id=job_id,
+            target_url=req.target_url,
+            scenario=req.scenario,
+            queue=queue,
+            users=req.users,
+            spawn_rate=req.spawn_rate,
+            run_time=req.run_time,
+            extra_env=req.extra_env,
+        )
+    else:
+        await run_k6(
+            job_id=job_id,
+            target_url=req.target_url,
+            finding_type=req.finding_type,
+            queue=queue,
+            vus=req.vus,
+            duration=req.duration,
+            extra_env=req.extra_env,
+        )
 
     # Drain the queue to capture final event
     done_event: dict | None = None
@@ -123,7 +147,9 @@ async def run_perf_test(body: PerfRunRequest, background_tasks: BackgroundTasks)
 
     _jobs[job_id] = {
         "status": "running",
+        "runner": body.runner,
         "finding_type": body.finding_type,
+        "scenario": body.scenario,
         "target_url": body.target_url,
         "script": None,
         "started_at": now,
@@ -134,7 +160,14 @@ async def run_perf_test(body: PerfRunRequest, background_tasks: BackgroundTasks)
     _job_queues[job_id] = asyncio.Queue(maxsize=2000)
 
     background_tasks.add_task(_run_job, job_id, body)
-    logger.info("perf job started", job_id=job_id, finding_type=body.finding_type, target=body.target_url)
+    logger.info(
+        "perf job started",
+        job_id=job_id,
+        runner=body.runner,
+        finding_type=body.finding_type,
+        scenario=body.scenario,
+        target=body.target_url,
+    )
 
     return _job_to_status(job_id, _jobs[job_id])
 

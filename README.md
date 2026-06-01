@@ -19,7 +19,7 @@ BluJay is an autonomous AppSec platform for intermediate–senior security engin
 
 **MCP integration** — BluJay exposes a Model Context Protocol server so AI assistants can query findings, trigger scans, and manage pipeline runs directly from chat — no UI required.
 
-**Performance correlation** — When a security finding is confirmed, finding-type-matched performance tests fire automatically to assess rate-limit gaps, race condition windows, and DoS viability under realistic load.
+**Performance correlation** — When a security finding is confirmed, BluJay fires a matching load test automatically. k6 handles finding-triggered scenarios (race conditions, brute-force rate limits, IDOR enumeration, spike/stress tests). Locust handles complex authenticated workflows that need stateful session management — OAuth flows, JWT rotation under concurrent load, WebSocket connections, and chained CRUD sequences. Results stream in real time via WebSocket.
 
 ## Features
 
@@ -71,6 +71,83 @@ Standalone Burp-style request editor:
 - **GraphQL Testing** — Introspection detection, batching abuse, alias DoS, field suggestion leakage, unauthenticated mutations
 - **Race Condition Testing** — Concurrent HTTP/2 replay with timing analysis and state mutation detection
 - **Recon** — Certificate transparency + DNS + cloud bucket discovery
+
+### Performance Testing
+
+BluJay uses two Docker-based load testing runners, both triggered via the same endpoint and streamed over WebSocket. No local k6 or Locust installation required — Docker handles it.
+
+**Choosing a runner:**
+- Use **k6** when a specific finding type was detected and you want a targeted, single-scenario load test. Fast to start, low setup.
+- Use **Locust** when the target has multi-step auth, token management, or dependent request sequences that k6 can't express without shared state. Slower to start (Locust bootstraps inside the container) but accurate for real-world auth flows.
+
+#### k6 — Finding-Triggered Test Matrix
+
+| `finding_type` | k6 script | What it measures |
+|---|---|---|
+| `race_condition` | `race_condition.js` | State mutation under concurrent burst (5 requests/VU/tick) |
+| `auth_endpoint` | `auth_brute.js` | Lockout threshold, rate-limit window, 429/423 detection |
+| `idor_found` | `idor_enum.js` | ID range sweep at scale, unauthorized access rate |
+| `api_endpoint` | `spike_test.js` | Spike load, DoS viability, error rate under sudden pressure |
+| `slow_response` | `stress_test.js` | Sustained stress, timing-based vuln confirmation |
+
+#### Locust — Complex Scenario Scripts
+
+| `scenario` | Script | Use case |
+|---|---|---|
+| `multi_user` | `multi_user_session.py` | Independent per-user sessions — tests auth state isolation |
+| `oauth` | `oauth_flow.py` | Client-credentials grant + proactive token refresh |
+| `jwt` | `jwt_rotation.py` | Login → use → rotate cycle — detects refresh token double-spend |
+| `websocket` | `websocket_load.py` | Concurrent WS connections — connection stability and message RTT |
+| `api_sequence` | `api_sequence.py` | Full CRUD lifecycle — create → read → update → delete per user |
+
+#### API
+
+```
+POST /api/v1/perf/run      Start a test job, returns job_id immediately
+GET  /api/v1/perf/jobs     List all jobs in this session
+GET  /api/v1/perf/{job_id} Poll job status (running | completed | failed)
+WS   /ws/perf/{job_id}     Stream results in real time
+```
+
+**k6 example:**
+```json
+POST /api/v1/perf/run
+{
+  "target_url": "https://api.example.com/transfer",
+  "runner": "k6",
+  "finding_type": "race_condition",
+  "vus": 25,
+  "duration": "30s"
+}
+```
+
+**Locust example:**
+```json
+POST /api/v1/perf/run
+{
+  "target_url": "https://api.example.com/api/orders",
+  "runner": "locust",
+  "scenario": "jwt",
+  "users": 20,
+  "spawn_rate": 5,
+  "run_time": "60s",
+  "extra_env": {
+    "USERNAME": "test@example.com",
+    "PASSWORD": "s3cr3t",
+    "ROTATE_EVERY": "15"
+  }
+}
+```
+
+**WebSocket event stream:**
+```jsonc
+{"type": "start",    "job_id": "...", "script": "jwt_rotation.py"}
+{"type": "progress", "output": "[locust] Hatching with 5 users per second ..."}
+{"type": "metric",   "data": {"metric": "locust_stats", "path": "/api/auth/refresh", "reqs": 240, "rps": 8.0, "avg_ms": 112.4, "fails": 0}}
+{"type": "done",     "job_id": "...", "exit_code": 0}
+```
+
+All Locust scripts accept `extra_env` keys to configure usernames, passwords, endpoints, token fields, and timing — no script editing needed for new targets. See `backend/data/locust_scripts/` for the full env var reference per script.
 
 ### Compliance & Reporting
 - **OWASP Scanner** — Full MASVS dynamic compliance scan (Android + iOS)
@@ -157,7 +234,7 @@ cd METATRON && ollama create metatron-qwen -f Modelfile
 1. Start the backend with `--no-reload`
 2. Click **Start** on the Proxy page
 3. Click **Configure Device** — configures ADB reverse proxy and sets the device proxy automatically
-4. Install the CA cert pushed to `/sdcard/Download/` (Settings → Security → Install certificate → CA certificate)
+4. Install the CA cert pushed to the device (Settings → Security → Install certificate → CA certificate)
 5. For apps with SSL pinning, attach Frida and load the **SSL Pinning Bypass** script
 
 ### iOS
@@ -171,24 +248,29 @@ cd METATRON && ollama create metatron-qwen -f Modelfile
 ## Configuration
 
 ```env
-# Server
+# Server — binds to localhost by default; do not expose to untrusted networks
 HOST=127.0.0.1
 PORT=8000
 WORKSPACE_DIR=~/.blujay
 
-# Proxy
-PROXY_HOST=0.0.0.0
+# Proxy — use 127.0.0.1 for Android (ADB reverse handles routing)
+# Set to your LAN IP only when the device cannot reach the host via ADB (e.g. iOS Wi-Fi proxy)
+PROXY_HOST=127.0.0.1
 PROXY_PORT=8089
 
-# Scanner paths (auto-resolved from tools/ if omitted)
-AODS_PATH=scanners/aods/dyna.py
-IODS_PATH=scanners/iods/ios_scan.py
+# Scanner paths — auto-resolved from tools/ if omitted
+# AODS_PATH=
+# IODS_PATH=
 
 # AI pipeline — omit to run fully on the local model
-ANTHROPIC_API_KEY=sk-ant-...
+ANTHROPIC_API_KEY=
 
-# NVD API — increases rate limit from 6 to 50 req/30s (optional)
-NVD_API_KEY=...
+# Performance testing — Docker images (defaults shown, pin to a specific tag for reproducibility)
+K6_DOCKER_IMAGE=grafana/k6:latest
+LOCUST_DOCKER_IMAGE=locustio/locust:latest
+
+# NVD API — increases rate limit (optional)
+NVD_API_KEY=
 
 # Logging
 LOG_LEVEL=INFO
@@ -196,7 +278,7 @@ LOG_LEVEL=INFO
 
 ## Workspace
 
-Runtime data (database, decompiled output, uploaded files, certificates, scan output) is stored in `~/.blujay/`. Not committed.
+Runtime data and scan output are stored in `~/.blujay/`. Not committed. Back this directory up and restrict its permissions — it contains sensitive analysis artifacts.
 
 ## License
 
