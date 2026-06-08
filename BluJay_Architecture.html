@@ -1,0 +1,1471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BluJay — Autonomous AppSec Architecture</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@300;400;500;600&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #070b14;
+    --bg2:       #0c1120;
+    --bg3:       #111827;
+    --border:    rgba(255,255,255,0.07);
+    --text:      #e2e8f0;
+    --muted:     #64748b;
+    --purple:    #a78bfa;
+    --purple-bg: rgba(167,139,250,0.08);
+    --purple-bd: rgba(167,139,250,0.25);
+    --blue:      #60a5fa;
+    --blue-bg:   rgba(96,165,250,0.08);
+    --blue-bd:   rgba(96,165,250,0.25);
+    --orange:    #fb923c;
+    --orange-bg: rgba(251,146,60,0.08);
+    --orange-bd: rgba(251,146,60,0.25);
+    --green:     #34d399;
+    --green-bg:  rgba(52,211,153,0.08);
+    --green-bd:  rgba(52,211,153,0.25);
+    --red:       #f87171;
+    --red-bg:    rgba(248,113,113,0.08);
+    --red-bd:    rgba(248,113,113,0.25);
+    --teal:      #2dd4bf;
+    --teal-bg:   rgba(45,212,191,0.08);
+    --teal-bd:   rgba(45,212,191,0.25);
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-width: 1500px;
+    padding: 48px 40px 80px;
+    background-image:
+      radial-gradient(ellipse 800px 500px at 20% 0%, rgba(96,165,250,0.04) 0%, transparent 70%),
+      radial-gradient(ellipse 600px 400px at 80% 100%, rgba(167,139,250,0.05) 0%, transparent 70%),
+      linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
+    background-size: 100% 100%, 100% 100%, 40px 40px, 40px 40px;
+  }
+
+  /* ── HEADER ── */
+  .header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 52px;
+    padding-bottom: 32px;
+    border-bottom: 1px solid var(--border);
+  }
+  .logo-block { display:flex; flex-direction:column; gap:6px; }
+  .logo {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 42px;
+    letter-spacing: -1px;
+    background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 50%, #34d399 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .logo span { font-weight: 400; opacity: 0.6; }
+  .tagline {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+  .meta-block { text-align:right; }
+  .meta-block .badge {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    background: rgba(52,211,153,0.1);
+    border: 1px solid rgba(52,211,153,0.3);
+    color: var(--green);
+    letter-spacing: 0.1em;
+    margin-bottom: 8px;
+  }
+  .meta-block p {
+    font-size: 11px;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* ── LEGEND ── */
+  .legend {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    margin-bottom: 44px;
+    padding: 14px 20px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    flex-wrap: wrap;
+  }
+  .legend-label {
+    font-size: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-right: 8px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 11px;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .legend-dot {
+    width: 10px; height: 10px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+  .legend-sep { width:1px; height:16px; background:var(--border); margin: 0 4px; }
+
+  /* ── LAYER WRAPPER ── */
+  .layer {
+    position: relative;
+    margin-bottom: 12px;
+    border-radius: 14px;
+    border: 1px solid var(--border);
+    overflow: visible;
+  }
+  .layer-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 22px;
+    border-bottom: 1px solid var(--border);
+    border-radius: 14px 14px 0 0;
+  }
+  .layer-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    background: rgba(255,255,255,0.05);
+    padding: 3px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+  .layer-title {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: 0.02em;
+  }
+  .layer-subtitle {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    margin-left: auto;
+    letter-spacing: 0.08em;
+  }
+  .layer-body {
+    padding: 20px 22px;
+    border-radius: 0 0 14px 14px;
+  }
+
+  /* ── ARROW CONNECTOR ── */
+  .arrow-connector {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 36px;
+    position: relative;
+    z-index: 2;
+  }
+  .arrow-line {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+  }
+  .arrow-shaft {
+    width: 2px;
+    height: 20px;
+    background: linear-gradient(180deg, var(--muted) 0%, var(--blue) 100%);
+    opacity: 0.5;
+  }
+  .arrow-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    background: var(--bg);
+    padding: 1px 8px;
+    border-radius: 3px;
+    border: 1px solid var(--border);
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    white-space: nowrap;
+  }
+  .arrow-head {
+    width: 0; height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 7px solid rgba(96,165,250,0.5);
+  }
+
+  /* ── COMPONENT GRID ── */
+  .comp-grid {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .comp-grid.cols-5 > .comp-card { flex: 1; min-width: 150px; }
+  .comp-grid.cols-4 > .comp-card { flex: 1; min-width: 200px; }
+  .comp-grid.cols-3 > .comp-card { flex: 1; min-width: 260px; }
+  .comp-grid.cols-6 > .comp-card { flex: 1; min-width: 180px; }
+
+  /* ── COMPONENT CARD ── */
+  .comp-card {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    transition: all 0.2s ease;
+    position: relative;
+    overflow: hidden;
+  }
+  .comp-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    border-radius: 10px 10px 0 0;
+    opacity: 0.7;
+  }
+  .comp-card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(255,255,255,0.15);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  }
+  .comp-card.purple::before  { background: var(--purple); }
+  .comp-card.blue::before    { background: var(--blue); }
+  .comp-card.orange::before  { background: var(--orange); }
+  .comp-card.green::before   { background: var(--green); }
+  .comp-card.red::before     { background: var(--red); }
+  .comp-card.teal::before    { background: var(--teal); }
+  .comp-card:hover.purple { background: var(--purple-bg); border-color: var(--purple-bd); }
+  .comp-card:hover.blue   { background: var(--blue-bg);   border-color: var(--blue-bd); }
+  .comp-card:hover.orange { background: var(--orange-bg); border-color: var(--orange-bd); }
+  .comp-card:hover.green  { background: var(--green-bg);  border-color: var(--green-bd); }
+  .comp-card:hover.red    { background: var(--red-bg);    border-color: var(--red-bd); }
+  .comp-card:hover.teal   { background: var(--teal-bg);   border-color: var(--teal-bd); }
+
+  .comp-icon {
+    font-size: 18px;
+    margin-bottom: 8px;
+    display: block;
+  }
+  .comp-name {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.03em;
+    margin-bottom: 10px;
+  }
+  .comp-name.purple { color: var(--purple); }
+  .comp-name.blue   { color: var(--blue); }
+  .comp-name.orange { color: var(--orange); }
+  .comp-name.green  { color: var(--green); }
+  .comp-name.red    { color: var(--red); }
+  .comp-name.teal   { color: var(--teal); }
+
+  .comp-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-top: 8px;
+  }
+  .tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    padding: 2px 7px;
+    border-radius: 3px;
+    letter-spacing: 0.05em;
+    border: 1px solid;
+    white-space: nowrap;
+  }
+  .tag.purple { color: var(--purple); border-color: var(--purple-bd); background: var(--purple-bg); }
+  .tag.blue   { color: var(--blue);   border-color: var(--blue-bd);   background: var(--blue-bg); }
+  .tag.orange { color: var(--orange); border-color: var(--orange-bd); background: var(--orange-bg); }
+  .tag.green  { color: var(--green);  border-color: var(--green-bd);  background: var(--green-bg); }
+  .tag.red    { color: var(--red);    border-color: var(--red-bd);    background: var(--red-bg); }
+  .tag.teal   { color: var(--teal);   border-color: var(--teal-bd);   background: var(--teal-bg); }
+  .tag.muted  { color: var(--muted);  border-color: var(--border);    background: rgba(255,255,255,0.03); }
+
+  .comp-desc {
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.6;
+    margin-top: 6px;
+  }
+
+  /* ── LAYER COLORS ── */
+  .layer.purple { border-color: var(--purple-bd); }
+  .layer.purple .layer-header { background: linear-gradient(90deg, rgba(167,139,250,0.08) 0%, transparent 80%); }
+  .layer.blue   { border-color: var(--blue-bd); }
+  .layer.blue   .layer-header { background: linear-gradient(90deg, rgba(96,165,250,0.08) 0%, transparent 80%); }
+  .layer.orange { border-color: var(--orange-bd); }
+  .layer.orange .layer-header { background: linear-gradient(90deg, rgba(251,146,60,0.08) 0%, transparent 80%); }
+  .layer.green  { border-color: var(--green-bd); }
+  .layer.green  .layer-header { background: linear-gradient(90deg, rgba(52,211,153,0.08) 0%, transparent 80%); }
+  .layer.red    { border-color: var(--red-bd); }
+  .layer.red    .layer-header { background: linear-gradient(90deg, rgba(248,113,113,0.08) 0%, transparent 80%); }
+  .layer.teal   { border-color: var(--teal-bd); }
+  .layer.teal   .layer-header { background: linear-gradient(90deg, rgba(45,212,191,0.08) 0%, transparent 80%); }
+
+  /* ── AGENT FLOW ── */
+  .agent-flow {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    margin-bottom: 16px;
+  }
+  .agent-node {
+    flex: 1;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 14px;
+    position: relative;
+    transition: all 0.2s ease;
+  }
+  .agent-node::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    border-radius: 10px 10px 0 0;
+    background: var(--orange);
+    opacity: 0.7;
+  }
+  .agent-node.gate::before { background: var(--red); }
+  .agent-node:hover {
+    background: var(--orange-bg);
+    border-color: var(--orange-bd);
+    transform: translateY(-2px);
+  }
+  .agent-node.gate:hover {
+    background: var(--red-bg);
+    border-color: var(--red-bd);
+  }
+  .agent-arrow {
+    display: flex;
+    align-items: center;
+    padding: 0 6px;
+    color: var(--muted);
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+  .agent-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: var(--orange);
+    margin-bottom: 5px;
+    letter-spacing: 0.1em;
+  }
+  .agent-node.gate .agent-num { color: var(--red); }
+  .agent-title {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 11px;
+    color: var(--orange);
+    margin-bottom: 8px;
+  }
+  .agent-node.gate .agent-title { color: var(--red); }
+
+  /* ── VARIANT LOOP ── */
+  .variant-loop {
+    background: rgba(251,146,60,0.04);
+    border: 1px dashed rgba(251,146,60,0.2);
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin-top: 12px;
+  }
+  .variant-loop-title {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 11px;
+    color: var(--orange);
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .variant-loop-title::before {
+    content: '↺';
+    font-size: 14px;
+  }
+  .variant-flow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .variant-step {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    padding: 5px 10px;
+    border-radius: 5px;
+    background: rgba(251,146,60,0.08);
+    border: 1px solid rgba(251,146,60,0.2);
+    color: var(--orange);
+    white-space: nowrap;
+  }
+  .variant-arrow { color: var(--muted); font-size: 12px; }
+  .variant-types {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+  }
+
+  /* ── CORE GRID (BluJay) ── */
+  .core-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .core-card {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--green-bd);
+    border-radius: 8px;
+    padding: 12px 14px;
+    transition: all 0.2s;
+  }
+  .core-card:hover {
+    background: var(--green-bg);
+    border-color: var(--green-bd);
+    border-left-color: var(--green);
+    transform: translateY(-1px);
+  }
+  .core-card-name {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 11px;
+    color: var(--green);
+    margin-bottom: 6px;
+  }
+  .core-card-endpoint {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: var(--muted);
+    margin-bottom: 7px;
+    letter-spacing: 0.04em;
+  }
+
+  /* ── INFRA ROW ── */
+  .infra-row {
+    display: flex;
+    gap: 10px;
+    margin-top: 12px;
+  }
+  .infra-pill {
+    flex: 1;
+    background: rgba(52,211,153,0.05);
+    border: 1px solid var(--green-bd);
+    border-radius: 8px;
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .infra-pill-icon { font-size: 16px; }
+  .infra-pill-label {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 11px;
+    color: var(--green);
+  }
+  .infra-pill-desc {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  /* ── PERF GRID ── */
+  .perf-split {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .perf-section-title {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 12px;
+    color: var(--red);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .perf-trigger-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 11px;
+  }
+  .perf-trigger-row:last-child { border-bottom: none; }
+  .perf-finding {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--red);
+    background: var(--red-bg);
+    border: 1px solid var(--red-bd);
+    padding: 2px 7px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+  .perf-test-type {
+    font-size: 11px;
+    color: var(--text);
+  }
+  .perf-outputs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
+  }
+
+  /* ── OUTPUT LAYER ── */
+  .output-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+  .output-card {
+    background: var(--bg3);
+    border: 1px solid var(--teal-bd);
+    border-radius: 10px;
+    padding: 16px;
+    transition: all 0.2s;
+  }
+  .output-card:hover {
+    background: var(--teal-bg);
+    border-color: var(--teal);
+    transform: translateY(-2px);
+  }
+  .output-icon { font-size: 22px; margin-bottom: 8px; display: block; }
+  .output-name {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 12px;
+    color: var(--teal);
+    margin-bottom: 8px;
+  }
+
+  /* ── INTEGRATION SECTION ── */
+  .integration-section {
+    margin-top: 28px;
+    padding: 24px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+  }
+  .integration-title {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--text);
+    margin-bottom: 18px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .integration-title::before {
+    content: '⬡';
+    color: var(--blue);
+    font-size: 16px;
+  }
+  .integration-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+  .integration-card {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    transition: all 0.2s;
+  }
+  .integration-card:hover {
+    border-color: rgba(96,165,250,0.3);
+    background: rgba(96,165,250,0.04);
+  }
+  .int-pair {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 11px;
+    color: var(--blue);
+    margin-bottom: 6px;
+  }
+  .int-detail {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.7;
+  }
+  .int-detail strong {
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  /* ── N8N SECTION ── */
+  .n8n-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  .n8n-sub {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--blue-bd);
+    border-radius: 8px;
+    padding: 12px 16px;
+    transition: all 0.2s;
+  }
+  .n8n-sub:hover {
+    background: var(--blue-bg);
+    border-color: var(--blue-bd);
+    border-left-color: var(--blue);
+  }
+  .n8n-sub-name {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 11px;
+    color: var(--blue);
+    margin-bottom: 8px;
+  }
+
+  /* ── FOOTER ── */
+  .footer {
+    margin-top: 48px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .footer-left {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+  }
+  .footer-right {
+    display: flex;
+    gap: 16px;
+  }
+  .stack-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    letter-spacing: 0.06em;
+  }
+
+  /* ── PULSE ANIMATION ── */
+  @keyframes pulse-border {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
+  }
+  .layer.green { animation: pulse-border 4s ease-in-out infinite; }
+  .layer.green:hover { animation: none; }
+
+  /* ── SECTION DIVIDER ── */
+  .section-note {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--muted);
+    text-align: center;
+    padding: 4px 0 4px;
+    letter-spacing: 0.08em;
+  }
+
+  /* ── NEW TAG ── */
+  .new-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    background: rgba(248,113,113,0.15);
+    border: 1px solid rgba(248,113,113,0.4);
+    color: var(--red);
+    letter-spacing: 0.08em;
+    margin-left: 8px;
+    vertical-align: middle;
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════ HEADER ═══════════ -->
+<header class="header">
+  <div class="logo-block">
+    <div class="logo">BluJay<span>.</span></div>
+    <div class="tagline">Autonomous AppSec Architecture &nbsp;·&nbsp; Workflow Automation &nbsp;·&nbsp; AI-Driven Pentesting</div>
+  </div>
+  <div class="meta-block">
+    <div class="badge">ARCHITECTURE v2.0</div>
+    <p>FastAPI · React · LangGraph · n8n · k6</p>
+    <p style="margin-top:4px; opacity:0.6;">Mobile &amp; Web Application Security Platform</p>
+  </div>
+</header>
+
+<!-- ═══════════ LEGEND ═══════════ -->
+<div class="legend">
+  <span class="legend-label">Legend</span>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--purple)"></div>External Triggers</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--blue)"></div>Workflow Orchestration</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--orange)"></div>Autonomous Agent Pipeline</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--green)"></div>BluJay Core</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--red)"></div>Performance Testing</div>
+  <div class="legend-item"><div class="legend-dot" style="background:var(--teal)"></div>Output &amp; Delivery</div>
+  <div class="legend-sep"></div>
+  <div class="legend-item" style="gap:10px">
+    <span style="font-family:JetBrains Mono,monospace;font-size:9px;color:var(--muted);border:1px dashed rgba(255,255,255,0.15);padding:2px 6px;border-radius:3px">- - -</span> Variant feedback loop
+  </div>
+</div>
+
+
+<!-- ═══════════ LAYER 0 — EXTERNAL TRIGGERS ═══════════ -->
+<div class="layer purple">
+  <div class="layer-header">
+    <span class="layer-num">LAYER 0</span>
+    <span class="layer-title" style="color:var(--purple)">External Triggers</span>
+    <span class="layer-subtitle">Event sources that initiate the autonomous pipeline</span>
+  </div>
+  <div class="layer-body">
+    <div class="comp-grid cols-5">
+
+      <div class="comp-card purple">
+        <span class="comp-icon">🐙</span>
+        <div class="comp-name purple">GitHub Push</div>
+        <div class="comp-desc">Code commit or PR merge triggers APK/IPA security scan automatically</div>
+        <div class="comp-tags">
+          <span class="tag purple">push event</span>
+          <span class="tag purple">PR merge</span>
+          <span class="tag muted">GitHub Actions</span>
+        </div>
+      </div>
+
+      <div class="comp-card purple">
+        <span class="comp-icon">📁</span>
+        <div class="comp-name purple">Google Drive</div>
+        <div class="comp-desc">New APK/IPA file upload detected via Drive watch triggers static analysis</div>
+        <div class="comp-tags">
+          <span class="tag purple">file watch</span>
+          <span class="tag purple">APK / IPA</span>
+          <span class="tag muted">Drive API</span>
+        </div>
+      </div>
+
+      <div class="comp-card purple">
+        <span class="comp-icon">💬</span>
+        <div class="comp-name purple">Slack Command</div>
+        <div class="comp-desc">Slash command from security team manually triggers targeted scan workflows</div>
+        <div class="comp-tags">
+          <span class="tag purple">/scan &lt;target&gt;</span>
+          <span class="tag purple">/pentest</span>
+          <span class="tag muted">Slack API</span>
+        </div>
+      </div>
+
+      <div class="comp-card purple">
+        <span class="comp-icon">⏱</span>
+        <div class="comp-name purple">Cron Schedule</div>
+        <div class="comp-desc">Time-based recurring scans — nightly full sweeps, weekly compliance runs</div>
+        <div class="comp-tags">
+          <span class="tag purple">nightly scan</span>
+          <span class="tag purple">weekly PCI</span>
+          <span class="tag muted">cron expression</span>
+        </div>
+      </div>
+
+      <div class="comp-card purple">
+        <span class="comp-icon">🔗</span>
+        <div class="comp-name purple">Webhook</div>
+        <div class="comp-desc">Inbound HTTP webhook from any external system — CI/CD, bug bounty, SIEM alerts</div>
+        <div class="comp-tags">
+          <span class="tag purple">POST /webhook</span>
+          <span class="tag purple">SIEM</span>
+          <span class="tag muted">CI/CD</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Arrow -->
+<div class="arrow-connector">
+  <div class="arrow-line">
+    <div class="arrow-shaft"></div>
+    <div class="arrow-label">HTTP events routed to n8n</div>
+    <div class="arrow-shaft"></div>
+    <div class="arrow-head"></div>
+  </div>
+</div>
+
+
+<!-- ═══════════ LAYER 1 — n8n ORCHESTRATION ═══════════ -->
+<div class="layer blue">
+  <div class="layer-header">
+    <span class="layer-num">LAYER 1</span>
+    <span class="layer-title" style="color:var(--blue)">Workflow Orchestration &nbsp;—&nbsp; n8n</span>
+    <span class="layer-subtitle">Self-hosted · Docker · localhost:5678 · REST</span>
+  </div>
+  <div class="layer-body">
+    <div class="n8n-grid">
+
+      <div class="n8n-sub">
+        <div class="n8n-sub-name">Trigger Nodes</div>
+        <div class="comp-tags">
+          <span class="tag blue">Webhook Receiver</span>
+          <span class="tag blue">Google Drive Watch</span>
+          <span class="tag blue">GitHub Actions Hook</span>
+          <span class="tag blue">Cron Node</span>
+          <span class="tag blue">Slack Event</span>
+        </div>
+      </div>
+
+      <div class="n8n-sub">
+        <div class="n8n-sub-name">HTTP Request Nodes → BluJay API</div>
+        <div class="comp-tags">
+          <span class="tag muted">POST /api/analysis</span>
+          <span class="tag muted">POST /api/owasp/scan</span>
+          <span class="tag muted">POST /api/strix/start</span>
+          <span class="tag muted">POST /api/ctf/start</span>
+          <span class="tag muted">GET /api/ollama/triage</span>
+          <span class="tag muted">POST /api/scanner/active</span>
+        </div>
+      </div>
+
+      <div class="n8n-sub">
+        <div class="n8n-sub-name">Router &amp; Decision Nodes</div>
+        <div class="comp-tags">
+          <span class="tag blue">Scan Type Router</span>
+          <span class="tag blue">Severity Filter</span>
+          <span class="tag blue">Finding Classifier</span>
+          <span class="tag blue">Approval Gate Check</span>
+          <span class="tag blue">Error Handler</span>
+        </div>
+      </div>
+
+      <div class="n8n-sub">
+        <div class="n8n-sub-name">Output Nodes</div>
+        <div class="comp-tags">
+          <span class="tag blue">Slack Notify</span>
+          <span class="tag blue">Jira Ticket</span>
+          <span class="tag blue">Email Alert</span>
+          <span class="tag blue">GitHub SARIF Upload</span>
+          <span class="tag blue">PagerDuty</span>
+          <span class="tag blue">LangGraph Webhook</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Arrow -->
+<div class="arrow-connector">
+  <div class="arrow-line">
+    <div class="arrow-shaft"></div>
+    <div class="arrow-label">Webhook → LangGraph · REST → BluJay</div>
+    <div class="arrow-shaft"></div>
+    <div class="arrow-head"></div>
+  </div>
+</div>
+
+
+<!-- ═══════════ LAYER 2 — LANGGRAPH AGENT PIPELINE ═══════════ -->
+<div class="layer orange">
+  <div class="layer-header">
+    <span class="layer-num">LAYER 2</span>
+    <span class="layer-title" style="color:var(--orange)">Autonomous Agent Pipeline &nbsp;—&nbsp; LangGraph</span>
+    <span class="layer-subtitle">Stateful graph · Python-native · Human-in-the-loop · Anthropic / Ollama LLM</span>
+  </div>
+  <div class="layer-body">
+
+    <!-- Agent Flow -->
+    <div class="agent-flow">
+
+      <div class="agent-node">
+        <div class="agent-num">NODE 01</div>
+        <div class="agent-title">Recon Agent</div>
+        <div class="comp-tags">
+          <span class="tag orange">nmap scan</span>
+          <span class="tag orange">subdomain enum</span>
+          <span class="tag orange">bucket discovery</span>
+          <span class="tag orange">TLS recon</span>
+          <span class="tag orange">IMDS probe</span>
+        </div>
+      </div>
+
+      <div class="agent-arrow">→</div>
+
+      <div class="agent-node">
+        <div class="agent-num">NODE 02</div>
+        <div class="agent-title">Exploit Agent</div>
+        <div class="comp-tags">
+          <span class="tag orange">payload fuzzing</span>
+          <span class="tag orange">auth bypass</span>
+          <span class="tag orange">IDOR</span>
+          <span class="tag orange">SSRF</span>
+          <span class="tag orange">XSS/SQLi</span>
+        </div>
+      </div>
+
+      <div class="agent-arrow">→</div>
+
+      <div class="agent-node gate">
+        <div class="agent-num">NODE 03</div>
+        <div class="agent-title" style="color:var(--red)">Human Review Gate</div>
+        <div class="comp-tags">
+          <span class="tag red">interrupt()</span>
+          <span class="tag red">Slack approve</span>
+          <span class="tag red">Slack deny</span>
+          <span class="tag red">POST /resume</span>
+        </div>
+      </div>
+
+      <div class="agent-arrow">→</div>
+
+      <div class="agent-node">
+        <div class="agent-num">NODE 04</div>
+        <div class="agent-title">PoC Validation Agent</div>
+        <div class="comp-tags">
+          <span class="tag orange">replay finding</span>
+          <span class="tag orange">confirm exploit</span>
+          <span class="tag orange">score severity</span>
+          <span class="tag orange">CVSS calc</span>
+        </div>
+      </div>
+
+      <div class="agent-arrow">→</div>
+
+      <div class="agent-node">
+        <div class="agent-num">NODE 05</div>
+        <div class="agent-title">Report Agent</div>
+        <div class="comp-tags">
+          <span class="tag orange">SARIF export</span>
+          <span class="tag orange">HTML report</span>
+          <span class="tag orange">MASVS map</span>
+          <span class="tag orange">remediation</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Variant Feedback Loop -->
+    <div class="variant-loop">
+      <div class="variant-loop-title">Variant Finding Feedback Loop &nbsp;—&nbsp; triggered post-Exploit Agent</div>
+      <div class="variant-flow">
+        <div class="variant-step">Finding Detected</div>
+        <span class="variant-arrow">→</span>
+        <div class="variant-step">Classify Type</div>
+        <span class="variant-arrow">→</span>
+        <div class="variant-step">Generate Variants</div>
+        <span class="variant-arrow">→</span>
+        <div class="variant-step">Re-run Scanner</div>
+        <span class="variant-arrow">→</span>
+        <div class="variant-step" style="color:var(--green);border-color:var(--green-bd);background:var(--green-bg)">New Finding? → Loop</div>
+        <span class="variant-arrow">/</span>
+        <div class="variant-step" style="color:var(--muted)">No Finding? → Exit</div>
+      </div>
+      <div class="variant-types" style="margin-top:12px">
+        <span style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted);margin-right:4px">Variant types:</span>
+        <span class="tag orange">SQLi → 15 SQL variants</span>
+        <span class="tag orange">IDOR → adjacent object IDs</span>
+        <span class="tag orange">Auth → token strip/replay</span>
+        <span class="tag orange">SSRF → internal IP range</span>
+        <span class="tag orange">XSS → DOM/reflected variants</span>
+        <span class="tag red">Race → concurrent tester</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Arrow -->
+<div class="arrow-connector">
+  <div class="arrow-line">
+    <div class="arrow-shaft"></div>
+    <div class="arrow-label">Python-native calls + REST → localhost:8000</div>
+    <div class="arrow-shaft"></div>
+    <div class="arrow-head"></div>
+  </div>
+</div>
+
+
+<!-- ═══════════ LAYER 3 — BLUJAY CORE ═══════════ -->
+<div class="layer green">
+  <div class="layer-header">
+    <span class="layer-num">LAYER 3</span>
+    <span class="layer-title" style="color:var(--green)">BluJay Core &nbsp;—&nbsp; FastAPI Backend</span>
+    <span class="layer-subtitle">Python 3.12 · FastAPI 0.111 · SQLite · Uvicorn · port 8000</span>
+  </div>
+  <div class="layer-body">
+
+    <div class="core-grid">
+
+      <div class="core-card">
+        <div class="core-card-name">Static Analysis</div>
+        <div class="core-card-endpoint">POST /api/analysis</div>
+        <div class="comp-tags">
+          <span class="tag green">APK/IPA upload</span>
+          <span class="tag green">permissions</span>
+          <span class="tag green">secrets scan</span>
+          <span class="tag green">YARA patterns</span>
+          <span class="tag muted">androguard</span>
+          <span class="tag muted">55+ cred patterns</span>
+        </div>
+      </div>
+
+      <div class="core-card">
+        <div class="core-card-name">Dynamic Analysis</div>
+        <div class="core-card-endpoint">POST /api/owasp/scan</div>
+        <div class="comp-tags">
+          <span class="tag green">AODS (Android)</span>
+          <span class="tag green">IODS (iOS)</span>
+          <span class="tag green">Frida hooks</span>
+          <span class="tag green">SSL pinning bypass</span>
+          <span class="tag muted">10 ML models</span>
+          <span class="tag muted">6 AI agents</span>
+        </div>
+      </div>
+
+      <div class="core-card">
+        <div class="core-card-name">Web Scanner</div>
+        <div class="core-card-endpoint">POST /api/scanner/active</div>
+        <div class="comp-tags">
+          <span class="tag green">XSS / SQLi</span>
+          <span class="tag green">SSRF</span>
+          <span class="tag green">path traversal</span>
+          <span class="tag green">open redirect</span>
+          <span class="tag muted">active payloads</span>
+          <span class="tag muted">passive recon</span>
+        </div>
+      </div>
+
+      <div class="core-card">
+        <div class="core-card-name">Auth Tester</div>
+        <div class="core-card-endpoint">POST /api/auth_tester</div>
+        <div class="comp-tags">
+          <span class="tag green">JWT / OAuth</span>
+          <span class="tag green">SAML</span>
+          <span class="tag green">session replay</span>
+          <span class="tag green">token stripping</span>
+          <span class="tag muted">cookie analysis</span>
+        </div>
+      </div>
+
+      <div class="core-card">
+        <div class="core-card-name">Vuln Intel</div>
+        <div class="core-card-endpoint">GET /api/vuln_intel</div>
+        <div class="comp-tags">
+          <span class="tag green">NVD CVE search</span>
+          <span class="tag green">Nuclei scans</span>
+          <span class="tag green">ExploitDB</span>
+          <span class="tag muted">24hr CVE cache</span>
+          <span class="tag muted">JSONL streaming</span>
+        </div>
+      </div>
+
+      <div class="core-card">
+        <div class="core-card-name">Strix Agent</div>
+        <div class="core-card-endpoint">POST /api/strix/start</div>
+        <div class="comp-tags">
+          <span class="tag green">autonomous pentest</span>
+          <span class="tag green">multi-agent coord</span>
+          <span class="tag green">PoC validation</span>
+          <span class="tag muted">Docker sandbox</span>
+          <span class="tag muted">Claude / GPT-4</span>
+        </div>
+      </div>
+
+      <div class="core-card">
+        <div class="core-card-name">Ollama Triage</div>
+        <div class="core-card-endpoint">GET /api/ollama/triage</div>
+        <div class="comp-tags">
+          <span class="tag green">local LLM</span>
+          <span class="tag green">MASVS mapping</span>
+          <span class="tag green">severity scoring</span>
+          <span class="tag muted">metatron-qwen</span>
+          <span class="tag muted">no cloud deps</span>
+        </div>
+      </div>
+
+      <div class="core-card">
+        <div class="core-card-name">CTF Auto-Recon</div>
+        <div class="core-card-endpoint">POST /api/ctf/start</div>
+        <div class="comp-tags">
+          <span class="tag green">nmap → scope</span>
+          <span class="tag green">Strix launch</span>
+          <span class="tag green">history store</span>
+          <span class="tag muted">20+ hint KB</span>
+          <span class="tag muted">JSON-backed</span>
+        </div>
+      </div>
+
+      <div class="core-card">
+        <div class="core-card-name">Race Condition</div>
+        <div class="core-card-endpoint">POST /api/race</div>
+        <div class="comp-tags">
+          <span class="tag green">concurrent replay</span>
+          <span class="tag green">timing analysis</span>
+          <span class="tag green">state mutation</span>
+          <span class="tag muted">httpx async</span>
+        </div>
+      </div>
+
+      <div class="core-card">
+        <div class="core-card-name">Cloud Tester</div>
+        <div class="core-card-endpoint">POST /api/cloud_tester</div>
+        <div class="comp-tags">
+          <span class="tag green">IMDS probing</span>
+          <span class="tag green">S3/GCS/Azure enum</span>
+          <span class="tag green">cred validation</span>
+          <span class="tag muted">boto3</span>
+          <span class="tag muted">DigitalOcean</span>
+        </div>
+      </div>
+
+      <div class="core-card">
+        <div class="core-card-name">Protocol Tester</div>
+        <div class="core-card-endpoint">POST /api/protocol</div>
+        <div class="comp-tags">
+          <span class="tag green">TLS/SSL audit</span>
+          <span class="tag green">LDAP / gRPC</span>
+          <span class="tag green">subdomain enum</span>
+          <span class="tag muted">cipher analysis</span>
+        </div>
+      </div>
+
+      <div class="core-card">
+        <div class="core-card-name">Agent Console</div>
+        <div class="core-card-endpoint">POST /api/agent</div>
+        <div class="comp-tags">
+          <span class="tag green">MobileMorphAgent</span>
+          <span class="tag green">ADB protocol</span>
+          <span class="tag green">manifest audit</span>
+          <span class="tag muted">port 31415</span>
+          <span class="tag muted">IPC analysis</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Infrastructure Row -->
+    <div class="infra-row">
+      <div class="infra-pill">
+        <span class="infra-pill-icon">🗄</span>
+        <div>
+          <div class="infra-pill-label">SQLite Database</div>
+          <div class="infra-pill-desc">15 tables · SQLAlchemy ORM · Alembic migrations · findings, sessions, scans, agents</div>
+        </div>
+      </div>
+      <div class="infra-pill">
+        <span class="infra-pill-icon">⚡</span>
+        <div>
+          <div class="infra-pill-label">WebSocket Streams</div>
+          <div class="infra-pill-desc">Real-time scan progress · Nuclei JSONL · AODS pipeline · Strix agent events</div>
+        </div>
+      </div>
+      <div class="infra-pill">
+        <span class="infra-pill-icon">⬛</span>
+        <div>
+          <div class="infra-pill-label">CLI Headless Mode</div>
+          <div class="infra-pill-desc">backend/cli.py · SARIF export · GitHub Code Scanning · CI/CD integration</div>
+        </div>
+      </div>
+      <div class="infra-pill">
+        <span class="infra-pill-icon">🔌</span>
+        <div>
+          <div class="infra-pill-label">MCP Server</div>
+          <div class="infra-pill-desc">mcp&gt;=1.0.0 · LangGraph agents as MCP tools · Claude chat interface direct access</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Arrow -->
+<div class="arrow-connector">
+  <div class="arrow-line">
+    <div class="arrow-shaft"></div>
+    <div class="arrow-label">n8n → POST /api/perf/run → Docker k6</div>
+    <div class="arrow-shaft"></div>
+    <div class="arrow-head"></div>
+  </div>
+</div>
+
+
+<!-- ═══════════ LAYER 4 — PERFORMANCE TESTING ═══════════ -->
+<div class="layer red">
+  <div class="layer-header">
+    <span class="layer-num">LAYER 4</span>
+    <span class="layer-title" style="color:var(--red)">Performance Testing &nbsp;—&nbsp; k6 + Locust</span>
+    <span class="layer-subtitle">Triggered by finding type · Docker container · streams results to BluJay</span>
+  </div>
+  <div class="layer-body">
+    <div class="perf-split">
+
+      <div>
+        <div class="perf-section-title">k6 &nbsp;— Finding-Triggered Test Matrix</div>
+        <div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:16px;">
+          <div class="perf-trigger-row">
+            <span class="perf-finding">Race Condition</span>
+            <span style="color:var(--muted);font-size:11px">→</span>
+            <span class="perf-test-type">Concurrent load test &nbsp;·&nbsp; state mutation under pressure</span>
+          </div>
+          <div class="perf-trigger-row">
+            <span class="perf-finding">Auth Endpoint</span>
+            <span style="color:var(--muted);font-size:11px">→</span>
+            <span class="perf-test-type">Brute-force rate limit test &nbsp;·&nbsp; lockout threshold detection</span>
+          </div>
+          <div class="perf-trigger-row">
+            <span class="perf-finding">IDOR Found</span>
+            <span style="color:var(--muted);font-size:11px">→</span>
+            <span class="perf-test-type">Enumeration load test &nbsp;·&nbsp; ID range sweep at scale</span>
+          </div>
+          <div class="perf-trigger-row">
+            <span class="perf-finding">API Endpoint</span>
+            <span style="color:var(--muted);font-size:11px">→</span>
+            <span class="perf-test-type">Spike test &nbsp;·&nbsp; DoS viability assessment</span>
+          </div>
+          <div class="perf-trigger-row">
+            <span class="perf-finding">Slow Response</span>
+            <span style="color:var(--muted);font-size:11px">→</span>
+            <span class="perf-test-type">Stress test &nbsp;·&nbsp; timing-based vulnerability confirmation</span>
+          </div>
+        </div>
+        <div style="margin-top:10px">
+          <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:11px;color:var(--red);margin-bottom:8px">k6 Output Metrics</div>
+          <div class="perf-outputs">
+            <span class="tag red">p95 / p99 latency</span>
+            <span class="tag red">requests/sec</span>
+            <span class="tag red">error rate under load</span>
+            <span class="tag red">rate limit threshold</span>
+            <span class="tag red">resource exhaustion</span>
+            <span class="tag red">timing-based vuln confirm</span>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="perf-section-title">Locust &nbsp;— Complex Scenario Scripting</div>
+        <div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:16px;height:calc(100% - 30px)">
+          <div class="comp-desc" style="color:var(--text);font-size:12px;margin-bottom:12px">
+            Python-native load testing for complex authenticated workflows that k6 can't model easily. Used when the target has multi-step auth flows, session chains, or stateful API sequences.
+          </div>
+          <div class="comp-tags">
+            <span class="tag red">multi-user sessions</span>
+            <span class="tag red">custom auth flows</span>
+            <span class="tag red">OAuth token refresh</span>
+            <span class="tag red">JWT rotation under load</span>
+            <span class="tag red">WebSocket load</span>
+            <span class="tag red">API sequence chaining</span>
+            <span class="tag muted">Python scripting</span>
+            <span class="tag muted">web UI dashboard</span>
+            <span class="tag muted">distributed workers</span>
+          </div>
+          <div style="margin-top:14px;padding:10px;background:rgba(52,211,153,0.05);border:1px solid var(--green-bd);border-radius:6px;">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--green)">Implemented endpoint:</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--green);margin-top:4px">POST /api/perf/run</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--muted);margin-top:3px">Accepts finding metadata · spawns Docker k6/Locust · streams results via WebSocket</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Arrow -->
+<div class="arrow-connector">
+  <div class="arrow-line">
+    <div class="arrow-shaft"></div>
+    <div class="arrow-label">Results routed through n8n output nodes</div>
+    <div class="arrow-shaft"></div>
+    <div class="arrow-head"></div>
+  </div>
+</div>
+
+
+<!-- ═══════════ LAYER 5 — OUTPUT & DELIVERY ═══════════ -->
+<div class="layer teal">
+  <div class="layer-header">
+    <span class="layer-num">LAYER 5</span>
+    <span class="layer-title" style="color:var(--teal)">Output &amp; Delivery</span>
+    <span class="layer-subtitle">Findings surface to teams, ticketing systems, and CI/CD gates</span>
+  </div>
+  <div class="layer-body">
+    <div class="output-grid">
+
+      <div class="output-card">
+        <span class="output-icon">💬</span>
+        <div class="output-name">Slack / Teams</div>
+        <div class="comp-tags">
+          <span class="tag teal">finding alert</span>
+          <span class="tag teal">severity tag</span>
+          <span class="tag teal">approve / deny buttons</span>
+          <span class="tag teal">LangGraph gate resume</span>
+          <span class="tag muted">Block Kit UI</span>
+        </div>
+      </div>
+
+      <div class="output-card">
+        <span class="output-icon">📋</span>
+        <div class="output-name">Jira / Linear</div>
+        <div class="comp-tags">
+          <span class="tag teal">auto ticket creation</span>
+          <span class="tag teal">CVE ID linked</span>
+          <span class="tag teal">repro steps</span>
+          <span class="tag teal">severity label</span>
+          <span class="tag muted">OWASP MASVS ref</span>
+        </div>
+      </div>
+
+      <div class="output-card">
+        <span class="output-icon">🔒</span>
+        <div class="output-name">GitHub SARIF</div>
+        <div class="comp-tags">
+          <span class="tag teal">Code Scanning upload</span>
+          <span class="tag teal">PR blocking gate</span>
+          <span class="tag teal">inline annotations</span>
+          <span class="tag teal">SARIF v2.1</span>
+          <span class="tag muted">cli.py export</span>
+        </div>
+      </div>
+
+      <div class="output-card">
+        <span class="output-icon">📧</span>
+        <div class="output-name">Email Report</div>
+        <div class="comp-tags">
+          <span class="tag teal">PDF report</span>
+          <span class="tag teal">HTML summary</span>
+          <span class="tag teal">scheduled delivery</span>
+          <span class="tag teal">exec summary</span>
+          <span class="tag muted">SMTP via n8n</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══════════ INTEGRATION NOTES ═══════════ -->
+<div class="integration-section">
+  <div class="integration-title">Integration Reference &nbsp;—&nbsp; Key Connection Points</div>
+  <div class="integration-grid">
+
+    <div class="integration-card">
+      <div class="int-pair">n8n ↔ BluJay Core</div>
+      <div class="int-detail">
+        Protocol: <strong>HTTP REST</strong><br>
+        Base URL: <strong>http://localhost:8000/api/*</strong><br>
+        Auth: existing FastAPI auth layer<br>
+        No new interface needed — all 42 endpoints are the contract.
+      </div>
+    </div>
+
+    <div class="integration-card">
+      <div class="int-pair">LangGraph ↔ BluJay Core</div>
+      <div class="int-detail">
+        Protocol: <strong>Python-native import + REST</strong><br>
+        LangGraph runs in the same Python env as BluJay.<br>
+        Agent nodes call <strong>httpx</strong> async client directly.<br>
+        Or import core modules without the HTTP hop.
+      </div>
+    </div>
+
+    <div class="integration-card">
+      <div class="int-pair">Human Gate — LangGraph → Slack → Resume</div>
+      <div class="int-detail">
+        LangGraph calls <strong>interrupt()</strong> to pause graph state.<br>
+        n8n sends Slack message with <strong>Approve / Deny</strong> buttons.<br>
+        Button click POSTs to n8n webhook → <strong>POST /api/agent/resume</strong><br>
+        LangGraph resumes from saved checkpoint.
+      </div>
+    </div>
+
+    <div class="integration-card">
+      <div class="int-pair">k6 Performance Trigger</div>
+      <div class="int-detail">
+        n8n HTTP node → <strong>POST /api/perf/run</strong> (new endpoint)<br>
+        Payload: finding type, target URL, severity<br>
+        Backend spawns <strong>Docker k6 container</strong><br>
+        Results streamed back via <strong>WebSocket</strong>
+      </div>
+    </div>
+
+    <div class="integration-card">
+      <div class="int-pair">MCP Server Integration</div>
+      <div class="int-detail">
+        <strong>mcp&gt;=1.0.0</strong> already installed in BluJay.<br>
+        Wire LangGraph agent nodes as <strong>MCP tools</strong>.<br>
+        Enables Claude chat interface to call BluJay scans directly.<br>
+        Anthropic Model Context Protocol standard.
+      </div>
+    </div>
+
+    <div class="integration-card">
+      <div class="int-pair">LLM Backend — Cost Strategy</div>
+      <div class="int-detail">
+        <strong>Routine nodes</strong> → Ollama (metatron-qwen, localhost:11434) — <strong>free</strong><br>
+        <strong>Exploit reasoning / gate summarization</strong> → Anthropic API — <strong>billed per token</strong><br>
+        Toggle via <strong>ANTHROPIC_API_KEY</strong> env var.<br>
+        Graceful degradation to heuristic mode.
+      </div>
+    </div>
+
+  </div>
+</div>
+
+
+<!-- ═══════════ FOOTER ═══════════ -->
+<div class="footer">
+  <div class="footer-left">
+    BluJay &nbsp;·&nbsp; Autonomous AppSec Architecture &nbsp;·&nbsp; Confidential<br>
+    <span style="opacity:0.5">Designed for AppSec Architectural Design Portfolio</span>
+  </div>
+  <div class="footer-right">
+    <span class="stack-badge">FastAPI 0.111</span>
+    <span class="stack-badge">React 18 + TypeScript</span>
+    <span class="stack-badge">LangGraph</span>
+    <span class="stack-badge">n8n self-hosted</span>
+    <span class="stack-badge">k6 + Locust</span>
+    <span class="stack-badge">Anthropic SDK</span>
+    <span class="stack-badge">Ollama</span>
+    <span class="stack-badge">MCP 1.0</span>
+  </div>
+</div>
+
+</body>
+</html>

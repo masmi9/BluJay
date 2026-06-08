@@ -42,6 +42,7 @@ from api.protocol_tester import router as protocol_tester_router
 from api.ai_agent import router as ai_agent_router
 from api.pipeline import router as pipeline_router
 from api.perf import router as perf_router
+from api.slack import router as slack_router
 
 api_router = APIRouter()
 api_router.include_router(analysis_router, prefix="/analyses", tags=["analysis"])
@@ -86,6 +87,7 @@ api_router.include_router(protocol_tester_router, prefix="/protocol", tags=["pro
 api_router.include_router(ai_agent_router, prefix="/ai-agents", tags=["ai-agents"])
 api_router.include_router(pipeline_router, prefix="/pipeline", tags=["pipeline"])
 api_router.include_router(perf_router, prefix="/perf", tags=["perf"])
+api_router.include_router(slack_router, prefix="/slack", tags=["slack"])
 
 # Singletons initialised lazily (so imports don't fail before lifespan runs)
 _proxy_manager = None

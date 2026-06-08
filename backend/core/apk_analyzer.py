@@ -198,8 +198,22 @@ async def run_analysis(
             })
         await _emit("secrets", 90, f"Secret scan complete — {len(secret_findings)} potential secrets found")
 
+        # --- Claude AI SAST ---
+        try:
+            from core.claude_sast import run_claude_sast
+            if jadx_dir.exists():
+                await _emit("claude_sast", 91, "Running AI-powered SAST analysis...")
+                sast_findings = await run_claude_sast(jadx_dir, analysis_id, progress_queue)
+                findings.extend(sast_findings)
+                await _emit("claude_sast", 96, f"AI SAST complete — {len(sast_findings)} findings")
+            else:
+                await _emit("claude_sast", 96, "AI SAST skipped — jadx output not available")
+        except Exception:
+            logger.exception("Claude SAST error — continuing without AI findings", analysis_id=analysis_id)
+            await _emit("claude_sast", 96, "AI SAST skipped (error)")
+
         # --- Persist findings ---
-        await _emit("saving", 92, "Saving findings to database...")
+        await _emit("saving", 97, "Saving findings to database...")
         async with AsyncSessionLocal() as db:
             for f in findings:
                 db.add(StaticFinding(analysis_id=analysis_id, **f))

@@ -30,6 +30,7 @@ _progress_queues: dict[int, asyncio.Queue] = {}
 class FromDeviceRequest(BaseModel):
     serial: str
     package: str
+    auto_pipeline: bool = False
 
 
 def get_progress_queue(analysis_id: int) -> asyncio.Queue | None:
@@ -87,6 +88,80 @@ async def _create_and_run(
     return analysis
 
 
+async def _pipeline_trigger_task(analysis_id: int) -> None:
+    """Waits for analysis to complete, then auto-launches the pentest pipeline."""
+    queue = _progress_queues.get(analysis_id)
+
+    if queue:
+        while True:
+            event = await queue.get()
+            if event.get("type") == "complete":
+                break
+            elif event.get("type") == "error":
+                return
+    else:
+        # Dedup case: analysis already finished; verify status in DB.
+        from database import AsyncSessionLocal
+        from sqlalchemy import select as sa_select
+        async with AsyncSessionLocal() as db:
+            result = await db.execute(sa_select(Analysis).where(Analysis.id == analysis_id))
+            existing = result.scalar_one_or_none()
+        if not existing or existing.status != "complete":
+            return
+
+    await _launch_pipeline(analysis_id)
+
+
+async def _launch_pipeline(analysis_id: int) -> None:
+    """Creates and starts a pipeline run for the given completed analysis."""
+    import uuid
+    from datetime import datetime, timezone
+    from database import AsyncSessionLocal
+    from sqlalchemy import select as sa_select
+
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(sa_select(Analysis).where(Analysis.id == analysis_id))
+        analysis = result.scalar_one_or_none()
+    if not analysis:
+        return
+
+    package = analysis.package_name or analysis.apk_filename.replace(".apk", "")
+
+    from api.pipeline import _runs, _queues as _pipe_queues, _run_pipeline
+    from agents.state import AgentState
+
+    run_id = str(uuid.uuid4())
+    now_iso = datetime.now(timezone.utc).isoformat()
+    initial_state: AgentState = {
+        "run_id": run_id,
+        "target_url": f"android://{package}",
+        "scan_type": "android",
+        "session_id": analysis_id,
+        "recon_results": [],
+        "exploit_findings": [],
+        "variant_iterations": 0,
+        "validated_findings": [],
+        "report_sarif": {},
+        "report_summary": "",
+        "gate_decision": None,
+        "gate_summary": "",
+        "messages": [],
+        "status": "running",
+        "error": None,
+    }
+    _runs[run_id] = {
+        "status": "running",
+        "target_url": f"android://{package}",
+        "scan_type": "android",
+        "state_snapshot": None,
+        "gate_payload": None,
+        "started_at": now_iso,
+        "finished_at": None,
+    }
+    _pipe_queues[run_id] = asyncio.Queue(maxsize=1000)
+    asyncio.create_task(_run_pipeline(run_id, initial_state))
+
+
 @router.post("/from-device", response_model=AnalysisSummary, status_code=201)
 async def analyze_from_device(
     body: FromDeviceRequest,
@@ -110,7 +185,12 @@ async def analyze_from_device(
     except RuntimeError as e:
         raise HTTPException(500, str(e))
 
-    return await _create_and_run(apk_path, f"{body.package}.apk", background_tasks, db)
+    analysis = await _create_and_run(apk_path, f"{body.package}.apk", background_tasks, db)
+
+    if body.auto_pipeline:
+        background_tasks.add_task(_pipeline_trigger_task, analysis.id)
+
+    return analysis
 
 
 @router.get("", response_model=list[AnalysisSummary])

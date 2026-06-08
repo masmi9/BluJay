@@ -37,6 +37,10 @@ class Settings(BaseSettings):
     morph_agent_project: str = r"C:\Users\MalikSmith\repos\Malik_MobileMorph_Project\MobileMorphAgent\android_agent"
     morph_agent_apk: str = r"C:\Users\MalikSmith\repos\Malik_MobileMorph_Project\MobileMorphAgent\android_agent\app\build\outputs\apk\debug\mmagent-debug.apk"
 
+    # Slack integration
+    slack_signing_secret: str = ""
+    slack_bot_token: str = ""
+
     # Logging
     log_level: str = "INFO"
 
