@@ -1,10 +1,11 @@
 ﻿import React, { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Virtuoso } from 'react-virtuoso'
-import { Play, Square, Trash2, Download, Smartphone, X, Send, Clipboard, Check, Apple, Radio, Filter, ShieldAlert } from 'lucide-react'
+import { Play, Square, Trash2, Download, Smartphone, X, Send, Clipboard, Check, Apple, Radio, Filter, ShieldAlert, Map, ChevronDown, ChevronRight, Tag, AlertTriangle, Lock, Eye, Zap } from 'lucide-react'
 import { clsx } from 'clsx'
 import { proxyApi } from '@/api/proxy'
+import { idorApi } from '@/api/idor'
 import { addScannerUrl } from '@/pages/ScannerPage'
 import { iosApi } from '@/api/ios'
 import { Badge } from '@/components/common/Badge'
@@ -13,7 +14,8 @@ import { CodeBlock } from '@/components/common/CodeBlock'
 import { useProxyStore } from '@/store/proxyStore'
 import { useDeviceStore } from '@/store/deviceStore'
 import { useProxyFlows } from '@/hooks/useProxyFlows'
-import type { ProxyFlow, ProxyFlowDetail } from '@/types/proxy'
+import type { ProxyFlow, ProxyFlowDetail, MappedEndpoint, EndpointFlag } from '@/types/proxy'
+import type { IDORFinding, IDORConfig, IDORStats } from '@/types/idor'
 import type { IosDeviceInfo } from '@/types/adb'
 
 export default function ProxyPage() {
@@ -23,6 +25,7 @@ export default function ProxyPage() {
   const [configuring, setConfiguring] = useState(false)
   const [configStatus, setConfigStatus] = useState<{ ok: boolean; msg: string } | null>(null)
   const statusTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [activeTab, setActiveTab] = useState<'traffic' | 'map' | 'idor'>('traffic')
 
   const [iosSetupOpen, setIosSetupOpen] = useState(false)
   const [selectedAndroidIp, setSelectedAndroidIp] = useState<string | null>(null)
@@ -298,26 +301,65 @@ export default function ProxyPage() {
         />
       )}
 
-      <SplitPane
-        direction="vertical"
-        defaultSplit={45}
-        className="flex-1"
-        left={<FlowTable
-          flows={flows.filter((f) => {
-            if (blockedHosts.length > 0 && blockedHosts.some((b) => f.host?.includes(b))) return false
-            if (activeTypeFilter && f.traffic_type !== activeTypeFilter) return false
-            return true
-          })}
-          selectedId={selectedFlowId}
-          onSelect={selectFlow}
-        />}
-        right={
-          <FlowDetailPanel
-            flow={flowDetail ?? null}
-            onSendToRepeater={flowDetail ? () => sendToRepeater(flowDetail) : undefined}
-          />
-        }
-      />
+      {/* Tab bar */}
+      <div className="flex items-center gap-1 px-4 border-b border-bg-border bg-bg-surface shrink-0">
+        <button
+          onClick={() => setActiveTab('traffic')}
+          className={clsx('px-3 py-2 text-xs font-medium border-b-2 transition-colors',
+            activeTab === 'traffic'
+              ? 'border-accent text-accent'
+              : 'border-transparent text-zinc-500 hover:text-zinc-300')}
+        >
+          Traffic
+        </button>
+        <button
+          onClick={() => setActiveTab('map')}
+          className={clsx('flex items-center gap-1 px-3 py-2 text-xs font-medium border-b-2 transition-colors',
+            activeTab === 'map'
+              ? 'border-accent text-accent'
+              : 'border-transparent text-zinc-500 hover:text-zinc-300')}
+        >
+          <Map size={11} />
+          Endpoint Map
+        </button>
+        <button
+          onClick={() => setActiveTab('idor')}
+          className={clsx('flex items-center gap-1 px-3 py-2 text-xs font-medium border-b-2 transition-colors',
+            activeTab === 'idor'
+              ? 'border-orange-400 text-orange-400'
+              : 'border-transparent text-zinc-500 hover:text-zinc-300')}
+        >
+          <AlertTriangle size={11} />
+          IDOR Test
+        </button>
+      </div>
+
+      {activeTab === 'traffic' ? (
+        <SplitPane
+          direction="vertical"
+          defaultSplit={45}
+          className="flex-1"
+          left={<FlowTable
+            flows={flows.filter((f) => {
+              if (blockedHosts.length > 0 && blockedHosts.some((b) => f.host?.includes(b))) return false
+              if (activeTypeFilter && f.traffic_type !== activeTypeFilter) return false
+              return true
+            })}
+            selectedId={selectedFlowId}
+            onSelect={selectFlow}
+          />}
+          right={
+            <FlowDetailPanel
+              flow={flowDetail ?? null}
+              onSendToRepeater={flowDetail ? () => sendToRepeater(flowDetail) : undefined}
+            />
+          }
+        />
+      ) : activeTab === 'map' ? (
+        <EndpointMapPanel sessionId={effectiveSessionId} />
+      ) : (
+        <IDORPanel sessionId={effectiveSessionId} />
+      )}
     </div>
   )
 }
@@ -798,6 +840,450 @@ function FlowDetailPanel({ flow, onSendToRepeater }: {
             statusLine={flow.response_status ? `${flow.response_status}${flow.duration_ms ? ` Â· ${flow.duration_ms.toFixed(0)}ms` : ''}` : undefined}
           />
         </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Endpoint Map Panel ────────────────────────────────────────────────────────
+
+const FLAG_META: Record<string, { label: string; icon: React.ReactNode; color: string }> = {
+  idor_candidate:   { label: 'IDOR',     icon: <AlertTriangle size={10} />, color: 'text-orange-400 bg-orange-500/10 border-orange-500/30' },
+  auth_required:    { label: 'Auth',      icon: <Lock size={10} />,          color: 'text-green-400 bg-green-500/10 border-green-500/30' },
+  pii_likely:       { label: 'PII',       icon: <Eye size={10} />,           color: 'text-red-400 bg-red-500/10 border-red-500/30' },
+  sensitive_method: { label: 'Mutating',  icon: <Zap size={10} />,           color: 'text-yellow-400 bg-yellow-500/10 border-yellow-500/30' },
+}
+
+function FlagBadge({ flag }: { flag: string }) {
+  const meta = FLAG_META[flag]
+  if (!meta) return null
+  return (
+    <span className={clsx('inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded border text-[10px] font-semibold', meta.color)}>
+      {meta.icon}{meta.label}
+    </span>
+  )
+}
+
+function EndpointRow({ ep, sessionId, host }: { ep: MappedEndpoint; sessionId: number; host: string }) {
+  const navigate = useNavigate()
+  const qc = useQueryClient()
+  const [editing, setEditing] = useState(false)
+  const [featureInput, setFeatureInput] = useState(ep.feature ?? '')
+
+  const featureMutation = useMutation({
+    mutationFn: (feature: string | null) =>
+      proxyApi.setEndpointFeature(sessionId, host, ep.pattern, feature),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['endpoint-map', sessionId] }),
+  })
+
+  const sendToRepeater = () => {
+    sessionStorage.setItem('repeater-preload', JSON.stringify({
+      method: ep.methods[0] ?? 'GET',
+      url: ep.sample_url,
+      headers: {},
+      body: null,
+    }))
+    navigate('/repeater')
+  }
+
+  return (
+    <div className="group flex flex-col gap-1 px-3 py-2 border-b border-bg-border hover:bg-bg-elevated transition-colors">
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-1 shrink-0">
+          {ep.methods.map((m) => <Badge key={m} variant="method" value={m} />)}
+        </div>
+        <span className="font-mono text-xs text-zinc-200 flex-1 truncate" title={ep.pattern}>{ep.pattern}</span>
+        <div className="flex items-center gap-1 flex-wrap">
+          {ep.flags.map((f) => <FlagBadge key={f} flag={f} />)}
+        </div>
+        <span className="text-[10px] text-zinc-600 shrink-0">×{ep.count}</span>
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button onClick={sendToRepeater} title="Send to Repeater"
+            className="flex items-center gap-1 px-1.5 py-0.5 text-[10px] bg-accent/10 text-accent hover:bg-accent/20 rounded transition-colors">
+            <Send size={9} /> Repeater
+          </button>
+          <button onClick={() => addScannerUrl(ep.sample_url)} title="Send to Scanner"
+            className="flex items-center gap-1 px-1.5 py-0.5 text-[10px] bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 rounded transition-colors">
+            <ShieldAlert size={9} /> Scan
+          </button>
+        </div>
+      </div>
+
+      {(ep.path_params.length + ep.query_params.length + ep.body_params.length > 0) && (
+        <div className="flex items-center gap-2 flex-wrap pl-1">
+          {ep.path_params.map((p) => (
+            <span key={p.name} className="text-[10px] font-mono text-zinc-500" title={`Path · ${p.type} · ${p.sample}`}>
+              <span className="text-zinc-600">path:</span>{p.name}
+            </span>
+          ))}
+          {ep.query_params.map((p) => (
+            <span key={p.name} className="text-[10px] font-mono text-zinc-500" title={`Query · ${p.type} · ${p.sample}`}>
+              <span className="text-zinc-600">?</span>{p.name}
+            </span>
+          ))}
+          {ep.body_params.slice(0, 8).map((p) => (
+            <span key={p.name} className="text-[10px] font-mono text-zinc-500" title={`Body · ${p.type} · ${p.sample}`}>
+              <span className="text-zinc-600">body:</span>{p.name}
+            </span>
+          ))}
+        </div>
+      )}
+
+      <div className="flex items-center gap-1.5 pl-1">
+        {editing ? (
+          <form className="flex items-center gap-1" onSubmit={(e) => {
+            e.preventDefault()
+            featureMutation.mutate(featureInput.trim() || null)
+            setEditing(false)
+          }}>
+            <input
+              autoFocus
+              value={featureInput}
+              onChange={(e) => setFeatureInput(e.target.value)}
+              placeholder="login / profile / settings…"
+              className="bg-bg-elevated border border-bg-border rounded px-2 py-0.5 text-[10px] font-mono text-zinc-300 focus:outline-none focus:border-accent w-40"
+            />
+            <button type="submit" className="px-1.5 py-0.5 text-[10px] bg-accent/10 text-accent hover:bg-accent/20 rounded">Save</button>
+            <button type="button" onClick={() => setEditing(false)} className="px-1.5 py-0.5 text-[10px] text-zinc-600 hover:text-zinc-300 rounded">Cancel</button>
+          </form>
+        ) : ep.feature ? (
+          <button onClick={() => { setFeatureInput(ep.feature ?? ''); setEditing(true) }}
+            className="flex items-center gap-1 text-[10px] text-blue-400 bg-blue-500/10 border border-blue-500/20 rounded px-1.5 py-0.5 hover:bg-blue-500/20 transition-colors">
+            <Tag size={9} />{ep.feature}
+          </button>
+        ) : (
+          <button onClick={() => setEditing(true)}
+            className="flex items-center gap-1 text-[10px] text-zinc-600 hover:text-zinc-400 transition-colors opacity-0 group-hover:opacity-100">
+            <Tag size={9} /> Label feature
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function HostGroup({ host, endpoints, sessionId }: { host: string; endpoints: MappedEndpoint[]; sessionId: number }) {
+  const [open, setOpen] = useState(true)
+  const idorCount = endpoints.filter((e) => e.flags.includes('idor_candidate')).length
+  const authCount = endpoints.filter((e) => e.flags.includes('auth_required')).length
+
+  return (
+    <div className="border-b border-bg-border">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center gap-2 px-3 py-2 bg-bg-surface hover:bg-bg-elevated transition-colors text-left"
+      >
+        {open ? <ChevronDown size={12} className="text-zinc-500 shrink-0" /> : <ChevronRight size={12} className="text-zinc-500 shrink-0" />}
+        <span className="font-mono text-xs text-zinc-300 flex-1 truncate">{host}</span>
+        <span className="text-[10px] text-zinc-500 shrink-0">{endpoints.length} endpoint{endpoints.length !== 1 ? 's' : ''}</span>
+        {idorCount > 0 && (
+          <span className="text-[10px] text-orange-400 bg-orange-500/10 border border-orange-500/20 rounded px-1.5 py-0.5 font-semibold shrink-0">
+            {idorCount} IDOR
+          </span>
+        )}
+        {authCount > 0 && (
+          <span className="text-[10px] text-green-400 bg-green-500/10 border border-green-500/20 rounded px-1.5 py-0.5 font-semibold shrink-0">
+            {authCount} Auth
+          </span>
+        )}
+      </button>
+      {open && (
+        <div>
+          {endpoints
+            .sort((a, b) => {
+              const aScore = (a.flags.includes('idor_candidate') ? 100 : 0) + a.count
+              const bScore = (b.flags.includes('idor_candidate') ? 100 : 0) + b.count
+              return bScore - aScore
+            })
+            .map((ep) => (
+              <EndpointRow key={ep.pattern} ep={ep} sessionId={sessionId} host={host} />
+            ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function EndpointMapPanel({ sessionId }: { sessionId: number }) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['endpoint-map', sessionId],
+    queryFn: () => proxyApi.getEndpointMap(sessionId),
+    refetchInterval: 3000,
+  })
+
+  const hosts = Object.keys(data?.map ?? {})
+  const stats = data?.stats
+
+  if (isLoading) {
+    return <div className="flex items-center justify-center h-32 text-zinc-600 text-sm">Loading…</div>
+  }
+
+  if (hosts.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-3 text-zinc-600">
+        <Map size={32} className="opacity-30" />
+        <p className="text-sm">No endpoints discovered yet</p>
+        <p className="text-xs text-zinc-700">Start the proxy and use the app — endpoints appear here automatically</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col h-full overflow-hidden">
+      {stats && (
+        <div className="flex items-center gap-4 px-4 py-2 border-b border-bg-border bg-bg-surface shrink-0">
+          <span className="text-xs text-zinc-500">{stats.hosts} host{stats.hosts !== 1 ? 's' : ''}</span>
+          <span className="text-xs text-zinc-500">{stats.endpoints} endpoint{stats.endpoints !== 1 ? 's' : ''}</span>
+          {stats.idor_candidates > 0 && (
+            <span className="flex items-center gap-1 text-xs text-orange-400">
+              <AlertTriangle size={11} />{stats.idor_candidates} IDOR candidate{stats.idor_candidates !== 1 ? 's' : ''}
+            </span>
+          )}
+          <span className="text-xs text-zinc-700 ml-auto">Live · updates every 3s</span>
+        </div>
+      )}
+      <div className="flex-1 overflow-y-auto">
+        {hosts.map((host) => (
+          <HostGroup key={host} host={host} endpoints={data!.map[host]} sessionId={sessionId} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ── IDOR Test Panel ───────────────────────────────────────────────────────────
+
+const CONFIDENCE_STYLE: Record<string, string> = {
+  high:   'text-red-400 bg-red-500/10 border-red-500/30',
+  medium: 'text-orange-400 bg-orange-500/10 border-orange-500/30',
+  low:    'text-yellow-400 bg-yellow-500/10 border-yellow-500/30',
+}
+
+function IDORFindingCard({ f }: { f: IDORFinding }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="border-b border-bg-border">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center gap-2 px-3 py-2.5 hover:bg-bg-elevated transition-colors text-left"
+      >
+        {open ? <ChevronDown size={12} className="text-zinc-500 shrink-0" /> : <ChevronRight size={12} className="text-zinc-500 shrink-0" />}
+        <span className={clsx('shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded border', CONFIDENCE_STYLE[f.confidence] ?? CONFIDENCE_STYLE.low)}>
+          {f.confidence.toUpperCase()}
+        </span>
+        <Badge variant="method" value={f.method} />
+        <span className="font-mono text-xs text-zinc-200 flex-1 truncate" title={f.url}>{f.url}</span>
+        <span className="text-[10px] text-zinc-500 shrink-0">
+          victim {f.victim_status} / attacker {f.attacker_status}
+        </span>
+        <span className="text-[10px] text-zinc-600 shrink-0">
+          {f.attacker_mode === 'unauthenticated' ? 'anon' : '2nd user'}
+        </span>
+      </button>
+      {open && (
+        <div className="px-3 pb-3 space-y-2">
+          <p className="text-xs text-zinc-400">{f.detail}</p>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <p className="text-[10px] text-zinc-600 mb-1">Victim response ({f.victim_status})</p>
+              <pre className="text-[10px] font-mono text-zinc-400 bg-bg-elevated rounded p-2 overflow-auto max-h-32 whitespace-pre-wrap break-all">
+                {f.victim_snippet || '(empty)'}
+              </pre>
+            </div>
+            <div>
+              <p className="text-[10px] text-zinc-600 mb-1">Attacker response ({f.attacker_status})</p>
+              <pre className="text-[10px] font-mono text-red-300 bg-red-500/5 rounded p-2 overflow-auto max-h-32 whitespace-pre-wrap break-all">
+                {f.attacker_snippet || '(empty)'}
+              </pre>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function IDORPanel({ sessionId }: { sessionId: number }) {
+  const qc = useQueryClient()
+
+  const { data: stats } = useQuery({
+    queryKey: ['idor-stats', sessionId],
+    queryFn: () => idorApi.getStats(sessionId),
+    refetchInterval: 2000,
+  })
+
+  const { data: findingsData } = useQuery({
+    queryKey: ['idor-findings', sessionId],
+    queryFn: () => idorApi.getFindings(sessionId),
+    refetchInterval: 3000,
+  })
+
+  const [victimAuth, setVictimAuth] = useState('')
+  const [victimHeader, setVictimHeader] = useState('Authorization')
+  const [attackerAuth, setAttackerAuth] = useState('')
+  const [attackerHeader, setAttackerHeader] = useState('Authorization')
+  const [testUnauth, setTestUnauth] = useState(true)
+  const [saving, setSaving] = useState(false)
+
+  const isEnabled = stats?.enabled ?? false
+  const findings = findingsData?.findings ?? []
+
+  const applyConfig = async (enabled: boolean) => {
+    setSaving(true)
+    try {
+      await idorApi.configure(sessionId, {
+        enabled,
+        victim_auth: victimAuth,
+        victim_auth_header: victimHeader,
+        attacker_auth: attackerAuth,
+        attacker_auth_header: attackerHeader,
+        test_unauthenticated: testUnauth,
+      })
+      qc.invalidateQueries({ queryKey: ['idor-stats', sessionId] })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* Config panel */}
+      <div className="shrink-0 px-4 py-3 border-b border-bg-border bg-bg-surface space-y-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          <span className="text-xs font-semibold text-zinc-300">IDOR / BOLA Interceptor</span>
+          {isEnabled ? (
+            <span className="flex items-center gap-1 text-xs text-green-400">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />Active
+            </span>
+          ) : (
+            <span className="text-xs text-zinc-600">Inactive</span>
+          )}
+          {stats && (
+            <div className="flex items-center gap-3 ml-auto text-xs text-zinc-500">
+              <span>{stats.tested} tested</span>
+              <span className="text-zinc-700">|</span>
+              <span>{stats.queue_depth} queued</span>
+              <span className="text-zinc-700">|</span>
+              <span className={findings.length > 0 ? 'text-red-400 font-semibold' : ''}>
+                {findings.length} finding{findings.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+          )}
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          {/* Victim auth */}
+          <div className="space-y-1">
+            <label className="text-[10px] text-zinc-500 uppercase tracking-wide">Victim auth token (your session)</label>
+            <div className="flex gap-1">
+              <select
+                value={victimHeader}
+                onChange={(e) => setVictimHeader(e.target.value)}
+                aria-label="Victim auth header"
+                className="bg-bg-elevated border border-bg-border rounded px-2 py-1 text-xs text-zinc-300 focus:outline-none focus:border-accent w-36 shrink-0"
+              >
+                <option>Authorization</option>
+                <option>Cookie</option>
+                <option>X-Auth-Token</option>
+                <option>X-API-Key</option>
+              </select>
+              <input
+                value={victimAuth}
+                onChange={(e) => setVictimAuth(e.target.value)}
+                placeholder="Bearer eyJ... or session=abc"
+                className="flex-1 bg-bg-elevated border border-bg-border rounded px-2 py-1 text-xs font-mono text-zinc-300 focus:outline-none focus:border-accent"
+              />
+            </div>
+          </div>
+
+          {/* Attacker auth */}
+          <div className="space-y-1">
+            <label className="text-[10px] text-zinc-500 uppercase tracking-wide">Attacker auth token (second account)</label>
+            <div className="flex gap-1">
+              <select
+                value={attackerHeader}
+                onChange={(e) => setAttackerHeader(e.target.value)}
+                aria-label="Attacker auth header"
+                className="bg-bg-elevated border border-bg-border rounded px-2 py-1 text-xs text-zinc-300 focus:outline-none focus:border-accent w-36 shrink-0"
+              >
+                <option>Authorization</option>
+                <option>Cookie</option>
+                <option>X-Auth-Token</option>
+                <option>X-API-Key</option>
+              </select>
+              <input
+                value={attackerAuth}
+                onChange={(e) => setAttackerAuth(e.target.value)}
+                placeholder="Bearer eyJ... or session=xyz (leave blank to skip)"
+                className="flex-1 bg-bg-elevated border border-bg-border rounded px-2 py-1 text-xs font-mono text-zinc-300 focus:outline-none focus:border-accent"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-4 flex-wrap">
+          <label className="flex items-center gap-2 text-xs text-zinc-400 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={testUnauth}
+              onChange={(e) => setTestUnauth(e.target.checked)}
+              className="accent-orange-400"
+            />
+            Also test without any auth (anonymous access)
+          </label>
+
+          <div className="flex items-center gap-2 ml-auto">
+            {isEnabled ? (
+              <button
+                onClick={() => applyConfig(false)}
+                disabled={saving}
+                className="px-3 py-1.5 text-xs bg-red-500/20 text-red-400 hover:bg-red-500/30 rounded transition-colors disabled:opacity-40"
+              >
+                <Square size={10} className="inline mr-1" />Stop
+              </button>
+            ) : (
+              <button
+                onClick={() => applyConfig(true)}
+                disabled={saving || (!attackerAuth && !testUnauth)}
+                className="px-3 py-1.5 text-xs bg-orange-500/20 text-orange-400 hover:bg-orange-500/30 rounded transition-colors disabled:opacity-40"
+                title={!attackerAuth && !testUnauth ? 'Enter attacker auth token or enable anonymous testing' : ''}
+              >
+                <Play size={10} className="inline mr-1" />Start IDOR Testing
+              </button>
+            )}
+            {isEnabled && (
+              <button
+                onClick={() => applyConfig(true)}
+                disabled={saving}
+                className="px-3 py-1.5 text-xs bg-zinc-700/40 text-zinc-400 hover:bg-zinc-700/60 rounded transition-colors disabled:opacity-40"
+              >
+                Update Config
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="text-[10px] text-zinc-600 leading-relaxed">
+          Interceptor watches proxied flows for ID-bearing paths (<code className="text-zinc-500">/users/42</code>, UUIDs) and id-like params.
+          Each unique endpoint is replayed under the attacker session. Confirmed IDOR findings are highlighted below and saved to scan findings.
+        </div>
+      </div>
+
+      {/* Findings list */}
+      <div className="flex-1 overflow-y-auto">
+        {findings.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full gap-2 text-zinc-600">
+            <AlertTriangle size={28} className="opacity-20" />
+            <p className="text-sm">No IDOR findings yet</p>
+            <p className="text-xs text-zinc-700">
+              {isEnabled ? 'Using the app — watching for IDOR candidates…' : 'Configure tokens above and start the interceptor'}
+            </p>
+          </div>
+        ) : (
+          <div>
+            {findings.map((f) => <IDORFindingCard key={f.id} f={f} />)}
+          </div>
+        )}
       </div>
     </div>
   )

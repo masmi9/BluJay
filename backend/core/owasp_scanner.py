@@ -66,10 +66,12 @@ def _find_ios_scan_py() -> Path | None:
 
 def _ensure_apktool_wrapper(dyna_dir: Path) -> None:
     """
-    dyna.py calls `apktool` as a plain subprocess command.  On Windows this
-    requires a .bat wrapper because apktool is distributed as a .jar.
-    Create apktool.bat in the AODS directory if it is absent or stale.
+    On Windows, dyna.py calls `apktool` as a plain subprocess command but can't
+    find .bat files via CreateProcess — so we write the wrapper ourselves.
+    No-op on macOS/Linux where apktool is a shell script already on PATH.
     """
+    if os.name != "nt":
+        return
     from config import settings
     bat = dyna_dir / "apktool.bat"
     jar = Path(str(settings.apktool_jar))
@@ -113,18 +115,33 @@ def _find_python_for_iods() -> str:
     return sys.executable
 
 
-def _parse_aods_output(output_dir: Path, package_name: str) -> dict:
+def _parse_aods_output(output_dir: Path, package_name: str, scanner_dir: Path | None = None) -> dict:
     """
     Parse AODS JSON report from the output directory.
     Returns a normalized dict with 'findings', 'summary', 'masvs'.
+
+    AODS sometimes fails to write to --output and falls back to writing to its
+    own reports/ subdirectory.  We search both locations so findings are never
+    lost when that fallback fires.
     """
-    # AODS writes files like: aods_parallel_<pkg>_<hash>.json, <pkg>_results.json, results.json
-    candidates = (
-        list(output_dir.glob("*.json"))
-        + list(output_dir.glob("**/*.json"))
-    )
+    candidates: list[Path] = []
+
+    # Primary: the directory we told AODS to write into
+    candidates += list(output_dir.glob("*.json"))
+    candidates += list(output_dir.glob("**/*.json"))
+
+    # Fallback: AODS auto-generated reports/ directory (relative to scanner CWD)
+    if scanner_dir:
+        reports_dir = scanner_dir / "reports"
+        if reports_dir.exists():
+            # Prefer files that mention the package name; include 3 most-recent as catch-all
+            pkg_reports = list(reports_dir.glob(f"*{package_name}*.json"))
+            recent = sorted(reports_dir.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)[:5]
+            candidates += pkg_reports
+            candidates += [p for p in recent if p not in candidates]
+
     # Filter out tiny stub files (< 10 bytes) and prefer largest file (most complete)
-    candidates = [p for p in candidates if p.stat().st_size > 10]
+    candidates = [p for p in candidates if p.exists() and p.stat().st_size > 10]
     if not candidates:
         return {"findings": [], "summary": {}, "raw": {}}
 
@@ -229,14 +246,18 @@ async def run_scan(
         _ensure_apktool_wrapper(scanner.parent)
         python = _find_python_for_aods()
         dyna_mode = "safe" if mode == "quick" else mode
+        # --output expects a FILE path, not a directory.  Passing the directory
+        # itself caused "Permission denied" because a dir with that name already
+        # existed, forcing AODS to fall back to its own reports/ folder.
+        output_file = output_dir / f"{package_name}_report.json"
         cmd = [
             python, str(scanner),
             "--apk", str(apk_path),
             "--pkg", package_name,
             "--mode", dyna_mode,
             "--formats", "json",
-            "--output", str(output_dir),
-            "--sequential",   # Windows doesn't support Unix signals used by parallel mode
+            "--output", str(output_file),
+            *(["--sequential"] if os.name == "nt" else []),  # Windows lacks Unix signals for parallel mode
         ]
         scanner_dir = scanner.parent
 
@@ -257,13 +278,17 @@ async def run_scan(
             env["PYTHONUTF8"] = "1"
             env["PATH"] = str(scanner_dir) + os.pathsep + env.get("PATH", "")
             # Tell AODS to invoke apktool via java -jar (Windows: .bat files can't
-            # be found by subprocess.run with shell=False / CreateProcess)
+            # be found by subprocess.run with shell=False / CreateProcess).
             if settings.apktool_jar and Path(str(settings.apktool_jar)).exists():
                 env["APKTOOL_JAR"] = str(settings.apktool_jar)
+            # Pass explicit java path so apk_ctx.py can use it directly.
+            env["JAVA_PATH"] = getattr(settings, "java_path", "java")
+            # Skip venv enforcement — BluJay selects the correct Python interpreter.
+            env["AODS_SKIP_VENV_CHECK"] = "1"
             proc = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
+                stderr=subprocess.PIPE,   # capture stderr separately for cleaner error logging
                 cwd=str(scanner_dir),
                 text=True,
                 encoding="utf-8",
@@ -271,6 +296,19 @@ async def run_scan(
                 env=env,
             )
             pct = 5
+            # Drain stderr in a background thread to prevent pipe-buffer deadlocks
+            stderr_lines: list[str] = []
+
+            def _drain_stderr():
+                for l in proc.stderr:
+                    stripped = l.rstrip()
+                    if stripped:
+                        stderr_lines.append(stripped)
+                        logger.debug("scanner_stderr", line=stripped)
+
+            stderr_thread = threading.Thread(target=_drain_stderr, daemon=True)
+            stderr_thread.start()
+
             for line in proc.stdout:
                 line = line.rstrip()
                 logger.debug("scanner", line=line)
@@ -284,11 +322,26 @@ async def run_scan(
                 elif any(k in line.lower() for k in ("report", "generat", "output")):
                     pct = max(pct, 85)
                 asyncio.run_coroutine_threadsafe(_emit(line[:200], pct), loop)
+
             proc.wait()
-            result_holder.append(proc.returncode)
+            stderr_thread.join(timeout=5)
+
+            rc = proc.returncode
+            if rc != 0 and stderr_lines:
+                # Surface the last few stderr lines so the error shows in the scan record
+                tail = "\n".join(stderr_lines[-10:])
+                logger.warning("scanner_exited_nonzero", returncode=rc, stderr_tail=tail)
+                asyncio.run_coroutine_threadsafe(
+                    _emit(f"[stderr] {stderr_lines[-1][:200]}", pct), loop
+                )
+            result_holder.append(rc)
         except Exception as e:
             logger.exception("AODS subprocess error", error=str(e))
             result_holder.append(-1)
+            # Surface the error so it appears in the progress stream
+            asyncio.run_coroutine_threadsafe(
+                _emit(f"Scanner launch error: {e}", pct), loop
+            )
         finally:
             loop.call_soon_threadsafe(done_event.set)
 
@@ -300,10 +353,13 @@ async def run_scan(
     returncode = result_holder[0] if result_holder else -1
 
     await _emit("Parsing results...", 90)
-    parsed = _parse_aods_output(output_dir, package_name)
+    parsed = _parse_aods_output(output_dir, package_name, scanner_dir=scanner_dir)
 
-    # Try HTML report
+    # Try HTML report — check both our output dir and the scanner's reports/ fallback
     html_files = list(output_dir.glob("*.html")) + list(output_dir.glob("**/*.html"))
+    _reports_dir = scanner_dir / "reports"
+    if _reports_dir.exists():
+        html_files += list(_reports_dir.glob(f"*{package_name}*.html"))
     report_html = None
     if html_files:
         try:

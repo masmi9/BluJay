@@ -25,6 +25,11 @@ import AuthTesterPage from '@/pages/AuthTesterPage'
 import VulnIntelPage from '@/pages/VulnIntelPage'
 import CloudTesterPage from '@/pages/CloudTesterPage'
 import ProtocolTesterPage from '@/pages/ProtocolTesterPage'
+import RedTeamPage from '@/pages/RedTeamPage'
+import BugBountyPage from '@/pages/BugBountyPage'
+import HuntPage from '@/pages/HuntPage'
+import IntruderPage from '@/pages/IntruderPage'
+import ExplorerPage from '@/pages/ExplorerPage'
 
 export default function App() {
   return (
@@ -52,12 +57,17 @@ export default function App() {
               <Route path="/scanner" element={<ApiScannerPage />} />
               <Route path="/ai-triage" element={<AiTriagePage />} />
               <Route path="/pci" element={<PciTestPage />} />
-              <Route path="/ctf" element={<CTFPage />} />
+              <Route path="/hunt" element={<HuntPage />} />
+              <Route path="/intruder" element={<IntruderPage />} />
+              <Route path="/explorer" element={<ExplorerPage />} />
+              <Route path="/ctf" element={<Navigate to="/hunt" replace />} />
               <Route path="/repeater" element={<RepeaterPage />} />
               <Route path="/auth-tester" element={<AuthTesterPage />} />
               <Route path="/vuln-intel" element={<VulnIntelPage />} />
               <Route path="/cloud-tester" element={<CloudTesterPage />} />
               <Route path="/protocol-tester" element={<ProtocolTesterPage />} />
+              <Route path="/red-team" element={<Navigate to="/scanner" replace />} />
+              <Route path="/bug-bounty" element={<Navigate to="/hunt" replace />} />
               {/* Legacy redirects */}
               <Route path="/api-scanner" element={<Navigate to="/scanner" replace />} />
               <Route path="/api-testing" element={<Navigate to="/scanner" replace />} />

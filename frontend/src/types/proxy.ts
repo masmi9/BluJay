@@ -36,6 +36,46 @@ export interface RaceResult {
   error: string
 }
 
+// ── Endpoint Map ─────────────────────────────────────────────────────────────
+
+export type EndpointFlag = 'idor_candidate' | 'auth_required' | 'pii_likely' | 'sensitive_method'
+export type ParamType = 'string' | 'integer' | 'uuid' | 'boolean'
+
+export interface EndpointParam {
+  name: string
+  type: ParamType
+  sample: string
+}
+
+export interface MappedEndpoint {
+  pattern: string
+  host: string
+  methods: string[]
+  sample_url: string
+  auth_headers: string[]
+  path_params: EndpointParam[]
+  query_params: EndpointParam[]
+  body_params: EndpointParam[]
+  flags: EndpointFlag[]
+  response_codes: number[]
+  count: number
+  feature: string | null
+  first_seen: string
+  last_seen: string
+}
+
+export interface EndpointMapStats {
+  hosts: number
+  endpoints: number
+  idor_candidates: number
+}
+
+export interface EndpointMapResponse {
+  session_id: number
+  stats: EndpointMapStats
+  map: Record<string, MappedEndpoint[]>
+}
+
 export interface RepeaterTab {
   id: string
   label: string

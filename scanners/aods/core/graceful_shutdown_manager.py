@@ -167,11 +167,13 @@ class GracefulShutdownManager:
         signal.signal(signal.SIGINT, protected_signal_handler)
         signal.signal(signal.SIGTERM, protected_signal_handler)
 
-        # On Windows, also handle CTRL_C_EVENT
+        # On Windows, CTRL_C_EVENT cannot be registered via signal.signal()
+        # (only SIGINT, SIGTERM, SIGBREAK, SIGABRT, SIGFPE, SIGILL, SIGSEGV are valid).
+        # SIGINT already covers Ctrl-C on Windows, so skip CTRL_C_EVENT entirely.
         if os.name == "nt":
             try:
-                signal.signal(signal.CTRL_C_EVENT, protected_signal_handler)
-            except AttributeError:
+                signal.signal(signal.SIGBREAK, protected_signal_handler)
+            except (AttributeError, ValueError, OSError):
                 pass
 
     def _handle_shutdown_signal(self, signum: int, frame):
@@ -309,10 +311,11 @@ class GracefulShutdownManager:
             if hasattr(process, "kill"):
                 process.kill()
             else:
-                # Assume it's a PID
-                os.kill(int(process), signal.SIGKILL)
-        except (ProcessLookupError, OSError):
-            # Process already terminated
+                # Assume it's a PID; SIGKILL is Unix-only — fall back to SIGTERM on Windows
+                sig = getattr(signal, "SIGKILL", signal.SIGTERM)
+                os.kill(int(process), sig)
+        except (ProcessLookupError, OSError, AttributeError):
+            # Process already terminated or signal unavailable
             pass
         finally:
             self.active_processes.pop(process_name, None)
@@ -397,11 +400,14 @@ class GracefulShutdownManager:
                 f"{_tmp}/aods_*", f"{_tmp}/drozer_*", f"{_tmp}/intent_fuzzing_*", f"{_tmp}/frida_*",
             ]
 
+            import glob
+            import shutil
             for pattern in temp_patterns:
-                try:
-                    subprocess.run(["rm", "-rf"] + [pattern], capture_output=True, timeout=2)
-                except (subprocess.TimeoutExpired, FileNotFoundError):
-                    pass
+                for path in glob.glob(pattern):
+                    try:
+                        shutil.rmtree(path, ignore_errors=True)
+                    except Exception:
+                        pass
 
         except Exception as e:
             self._log("debug", f"Temp file cleanup error: {e}")

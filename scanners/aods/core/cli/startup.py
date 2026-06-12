@@ -61,6 +61,11 @@ def setup_ml_environment_safely():
 
 def enforce_aods_venv():
     """Enforce AODS virtual environment requirement before execution."""
+    # When launched by BluJay's backend, venv enforcement is bypassed because
+    # BluJay manages its own Python interpreter selection via aods_venv_python.
+    if os.environ.get("AODS_SKIP_VENV_CHECK", "0") == "1":
+        return
+
     try:
         from tests.test_venv_preflight import AODSVenvEnforcementIntegration
 

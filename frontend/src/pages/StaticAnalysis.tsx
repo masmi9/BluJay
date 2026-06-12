@@ -1,19 +1,23 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Loader2, AlertCircle, ChevronRight, ChevronDown, File, Folder, RefreshCw, ShieldAlert, Code2, FileDown } from 'lucide-react'
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query'
+import { Loader2, AlertCircle, ChevronRight, ChevronDown, File, Folder, RefreshCw, ShieldAlert, Code2, FileDown, FlaskConical, Wifi, WifiOff } from 'lucide-react'
 import { RiskScoreCard } from '@/components/analysis/RiskScoreCard'
 import { riskApi } from '@/api/risk'
 import { clsx } from 'clsx'
 import { analysisApi } from '@/api/analysis'
 import { iosApi } from '@/api/ios'
 import { cveApi } from '@/api/cve'
+import { mobsfApi } from '@/api/mobsf'
 import { Badge } from '@/components/common/Badge'
 import { CodeBlock } from '@/components/common/CodeBlock'
 import type { PermissionInfo, ComponentInfo, StaticFinding, SourceEntry } from '@/types/analysis'
 
-const TABS = ['Overview', 'Manifest', 'Permissions', 'Components', 'Secrets', 'Source'] as const
+const TABS = ['Overview', 'Manifest', 'Permissions', 'Components', 'Secrets', 'Source', 'MobSF'] as const
 type Tab = typeof TABS[number]
+
+// Show MobSF fallback prompt after this many ms of a pending primary scan
+const MOBSF_PROMPT_AFTER_MS = 30_000
 
 export default function StaticAnalysis() {
   const { id } = useParams<{ id: string }>()
@@ -22,6 +26,9 @@ export default function StaticAnalysis() {
   const [sourcePath, setSourcePath] = useState('')
   const [openFile, setOpenFile] = useState<string | null>(null)
   const [reanalyzing, setReanalyzing] = useState(false)
+  const [mobsfScanHash, setMobsfScanHash] = useState<string | null>(null)
+  const [showMobsfPrompt, setShowMobsfPrompt] = useState(false)
+  const pendingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const queryClient = useQueryClient()
   const navigate = useNavigate()
 
@@ -84,6 +91,28 @@ export default function StaticAnalysis() {
     queryKey: ['file', analysisId, openFile],
     queryFn: () => analysisApi.readFile(analysisId, openFile!),
     enabled: !!openFile,
+  })
+
+  // Show MobSF fallback prompt if primary scan is still pending after threshold
+  useEffect(() => {
+    if (!analysis) return
+    const isPending = analysis.status !== 'complete' && analysis.status !== 'failed'
+    if (isPending && !showMobsfPrompt) {
+      pendingTimerRef.current = setTimeout(() => setShowMobsfPrompt(true), MOBSF_PROMPT_AFTER_MS)
+    } else {
+      if (pendingTimerRef.current) clearTimeout(pendingTimerRef.current)
+      if (!isPending) setShowMobsfPrompt(false)
+    }
+    return () => { if (pendingTimerRef.current) clearTimeout(pendingTimerRef.current) }
+  }, [analysis?.status])
+
+  const mobsfScanMutation = useMutation({
+    mutationFn: () => mobsfApi.scan(analysisId),
+    onSuccess: (data) => {
+      setMobsfScanHash(data.scan_hash)
+      setShowMobsfPrompt(false)
+      setTab('MobSF')
+    },
   })
 
   if (isLoading) return <div className="flex items-center justify-center h-64"><Loader2 className="animate-spin text-accent" /></div>
@@ -161,6 +190,20 @@ export default function StaticAnalysis() {
             {analysis.status}...
           </div>
         )}
+        {showMobsfPrompt && (
+          <div className="flex items-center gap-3 mb-3 px-3 py-2 rounded-lg bg-yellow-500/10 border border-yellow-500/30 text-xs text-yellow-300">
+            <FlaskConical size={13} className="shrink-0" />
+            <span>Primary scan is taking a while. Run MobSF as a fallback?</span>
+            <button
+              onClick={() => mobsfScanMutation.mutate()}
+              disabled={mobsfScanMutation.isPending}
+              className="ml-auto px-2 py-0.5 rounded bg-yellow-500/20 hover:bg-yellow-500/40 text-yellow-200 transition-colors disabled:opacity-50"
+            >
+              {mobsfScanMutation.isPending ? 'Scanning...' : 'Run MobSF'}
+            </button>
+            <button onClick={() => setShowMobsfPrompt(false)} className="text-zinc-500 hover:text-zinc-300">✕</button>
+          </div>
+        )}
         <div className="flex gap-1">
           {TABS.map((t) => (
             <button
@@ -205,6 +248,15 @@ export default function StaticAnalysis() {
             onOpenFile={setOpenFile}
             openFile={openFile}
             fileContent={fileContent?.content}
+          />
+        )}
+        {tab === 'MobSF' && (
+          <MobSFTab
+            analysisId={analysisId}
+            scanHash={mobsfScanHash}
+            onScan={() => mobsfScanMutation.mutate()}
+            scanning={mobsfScanMutation.isPending}
+            scanError={mobsfScanMutation.error?.message}
           />
         )}
       </div>
@@ -508,6 +560,125 @@ function SourceTab({ entries, sourcePath, onNavigate, onOpenFile, openFile, file
           <div className="text-zinc-600 text-sm p-4">Select a file to view its source</div>
         )}
       </div>
+    </div>
+  )
+}
+
+// ── MobSF secondary analysis tab ──────────────────────────────────────────
+
+interface MobSFTabProps {
+  analysisId: number
+  scanHash: string | null
+  onScan: () => void
+  scanning: boolean
+  scanError?: string
+}
+
+function MobSFTab({ analysisId, scanHash, onScan, scanning, scanError }: MobSFTabProps) {
+  const { data: status } = useQuery({
+    queryKey: ['mobsf-status'],
+    queryFn: mobsfApi.status,
+    staleTime: 30_000,
+  })
+
+  const { data: report, isLoading: reportLoading } = useQuery({
+    queryKey: ['mobsf-report', scanHash],
+    queryFn: () => mobsfApi.report(scanHash!),
+    enabled: !!scanHash,
+  })
+
+  const severityColor: Record<string, string> = {
+    high: 'text-red-400',
+    warning: 'text-orange-400',
+    info: 'text-blue-400',
+    secure: 'text-green-400',
+  }
+
+  return (
+    <div className="space-y-5 max-w-3xl text-sm">
+      {/* Status bar */}
+      <div className="flex items-center gap-3 p-3 rounded-lg bg-bg-surface border border-bg-border">
+        {status?.reachable ? (
+          <Wifi size={14} className="text-green-400 shrink-0" />
+        ) : (
+          <WifiOff size={14} className="text-zinc-600 shrink-0" />
+        )}
+        <span className="text-xs text-zinc-400">
+          MobSF — {status?.reachable ? <span className="text-green-400">running at {status.url}</span> : <span className="text-zinc-500">not reachable ({status?.url ?? '…'})</span>}
+        </span>
+        {!status?.reachable && (
+          <span className="ml-auto text-xs text-zinc-600 font-mono">docker run -it -p 8008:8008 ghcr.io/mobsf/mobile-security-framework-mobsf:latest</span>
+        )}
+      </div>
+
+      {/* Launch button */}
+      {!scanHash && (
+        <div className="flex flex-col items-start gap-3">
+          <p className="text-zinc-400 text-xs leading-relaxed max-w-lg">
+            MobSF is a secondary static analysis engine. Run it to get a second-opinion report
+            alongside BluJay's own findings — useful when the primary scan stalls or for cross-checking results.
+          </p>
+          <button
+            onClick={onScan}
+            disabled={scanning || !status?.reachable}
+            className="flex items-center gap-2 px-3 py-1.5 rounded bg-accent text-white text-xs hover:bg-accent/80 disabled:opacity-40 transition-colors"
+          >
+            {scanning ? <Loader2 size={12} className="animate-spin" /> : <FlaskConical size={12} />}
+            {scanning ? 'Uploading & Scanning…' : 'Run MobSF Scan'}
+          </button>
+          {scanError && <p className="text-xs text-red-400">{scanError}</p>}
+        </div>
+      )}
+
+      {/* Report */}
+      {scanHash && reportLoading && (
+        <div className="flex items-center gap-2 text-xs text-zinc-400">
+          <Loader2 size={12} className="animate-spin text-accent" /> Fetching MobSF report…
+        </div>
+      )}
+      {report && (
+        <div className="space-y-4">
+          {/* Summary row */}
+          <div className="grid grid-cols-4 gap-3">
+            {(['high', 'warning', 'info', 'secure'] as const).map((level) => {
+              const section = (report as any)[level] as unknown[]
+              return (
+                <div key={level} className="bg-bg-surface rounded-lg p-3 border border-bg-border text-center">
+                  <p className={`text-xl font-mono font-semibold ${severityColor[level]}`}>{section?.length ?? 0}</p>
+                  <p className="text-xs text-zinc-500 mt-1 capitalize">{level}</p>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Findings by severity */}
+          {(['high', 'warning', 'info'] as const).map((level) => {
+            const items = ((report as any)[level] as any[]) ?? []
+            if (!items.length) return null
+            return (
+              <div key={level}>
+                <h3 className={`text-xs uppercase tracking-wide mb-2 ${severityColor[level]}`}>{level} ({items.length})</h3>
+                <div className="space-y-1.5">
+                  {items.map((item: any, i: number) => (
+                    <div key={i} className="bg-bg-surface rounded-lg p-3 border border-bg-border">
+                      <p className="text-zinc-200 font-medium text-xs">{item.title ?? item.issue ?? JSON.stringify(item).slice(0, 80)}</p>
+                      {item.description && <p className="text-zinc-500 text-xs mt-1">{item.description}</p>}
+                      {item.cvss !== undefined && <p className="text-zinc-600 text-xs mt-1">CVSS {item.cvss}</p>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          })}
+
+          <button
+            onClick={onScan}
+            className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+          >
+            <RefreshCw size={11} /> Re-run MobSF scan
+          </button>
+        </div>
+      )}
     </div>
   )
 }

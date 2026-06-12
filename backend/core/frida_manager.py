@@ -119,6 +119,57 @@ class FridaManager:
         await self._update_db_frida_attached(db_session_id, True)
         return {"status": "attached", "package": package_name}
 
+    async def spawn_attach(
+        self,
+        db_session_id: int,
+        device_serial: str,
+        package_name: str,
+        startup_script: str | None = None,
+    ) -> dict:
+        """
+        Spawn the app fresh, attach before resume, optionally inject a startup script,
+        then resume. Gives scripts maximum coverage from process start.
+        """
+        import frida
+
+        loop = asyncio.get_event_loop()
+        try:
+            device = frida.get_device(device_serial)
+        except Exception as e:
+            raise RuntimeError(f"Cannot get device {device_serial}: {e}")
+
+        try:
+            pid = device.spawn([package_name])
+            session = device.attach(pid)
+        except Exception as e:
+            raise RuntimeError(f"Cannot spawn {package_name}: {e}")
+
+        frida_sess = _FridaSession(
+            db_session_id=db_session_id,
+            device_serial=device_serial,
+            package_name=package_name,
+            frida_session=session,
+            loop=loop,
+        )
+        self._sessions[db_session_id] = frida_sess
+        asyncio.create_task(self._fanout(db_session_id, frida_sess))
+
+        script_id = None
+        if startup_script:
+            try:
+                script_id = await self.load_script(db_session_id, "startup", startup_script)
+            except Exception as e:
+                logger.warning("Startup script load failed", error=str(e))
+
+        try:
+            device.resume(pid)
+        except Exception as e:
+            raise RuntimeError(f"Cannot resume {package_name} (pid {pid}): {e}")
+
+        await self._update_db_frida_attached(db_session_id, True)
+        logger.info("Frida spawn-attached", session_id=db_session_id, package=package_name, pid=pid)
+        return {"status": "attached", "mode": "spawn", "package": package_name, "pid": pid, "startup_script_id": script_id}
+
     async def load_script(self, db_session_id: int, name: str, source: str) -> str:
         sess = self._sessions.get(db_session_id)
         if not sess:

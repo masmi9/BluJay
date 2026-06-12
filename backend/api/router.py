@@ -42,6 +42,12 @@ from api.protocol_tester import router as protocol_tester_router
 from api.ai_agent import router as ai_agent_router
 from api.pipeline import router as pipeline_router
 from api.perf import router as perf_router
+from api.idor import router as idor_router
+from api.mobsf import router as mobsf_router
+from api.playstore import router as playstore_router
+from api.red_team import router as red_team_router
+from api.bugbounty import router as bugbounty_router
+from api.intruder import router as intruder_router
 
 api_router = APIRouter()
 api_router.include_router(analysis_router, prefix="/analyses", tags=["analysis"])
@@ -86,10 +92,18 @@ api_router.include_router(protocol_tester_router, prefix="/protocol", tags=["pro
 api_router.include_router(ai_agent_router, prefix="/ai-agents", tags=["ai-agents"])
 api_router.include_router(pipeline_router, prefix="/pipeline", tags=["pipeline"])
 api_router.include_router(perf_router, prefix="/perf", tags=["perf"])
+api_router.include_router(idor_router, prefix="/idor", tags=["idor"])
+api_router.include_router(mobsf_router, prefix="/mobsf", tags=["mobsf"])
+api_router.include_router(playstore_router, prefix="/playstore", tags=["playstore"])
+api_router.include_router(red_team_router, prefix="/red-team", tags=["red-team"])
+api_router.include_router(bugbounty_router, prefix="/bugbounty", tags=["bugbounty"])
+api_router.include_router(intruder_router, prefix="/intruder", tags=["intruder"])
 
 # Singletons initialised lazily (so imports don't fail before lifespan runs)
 _proxy_manager = None
 _frida_manager = None
+_endpoint_mapper = None
+_idor_interceptor = None
 
 
 def get_proxy_manager():
@@ -108,3 +122,19 @@ def get_frida_manager():
         from database import AsyncSessionLocal
         _frida_manager = FridaManager(AsyncSessionLocal)
     return _frida_manager
+
+
+def get_endpoint_mapper():
+    global _endpoint_mapper
+    if _endpoint_mapper is None:
+        from core.endpoint_mapper import EndpointMapper
+        _endpoint_mapper = EndpointMapper()
+    return _endpoint_mapper
+
+
+def get_idor_interceptor():
+    global _idor_interceptor
+    if _idor_interceptor is None:
+        from core.idor_interceptor import IDORInterceptor
+        _idor_interceptor = IDORInterceptor()
+    return _idor_interceptor

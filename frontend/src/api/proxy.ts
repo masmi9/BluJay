@@ -1,5 +1,5 @@
 import { api } from './client'
-import type { ProxyFlow, ProxyFlowDetail, RepeaterResponse } from '@/types/proxy'
+import type { ProxyFlow, ProxyFlowDetail, RepeaterResponse, EndpointMapResponse } from '@/types/proxy'
 
 export const proxyApi = {
   start: (sessionId: number = 0, port = 8080) =>
@@ -27,4 +27,8 @@ export const proxyApi = {
   certServerStatus: () =>
     api.get<{ running: boolean }>('/proxy/cert-server/status').then((r) => r.data),
   certQrUrl: (url: string) => `/api/v1/proxy/cert-qr?url=${encodeURIComponent(url)}`,
+  getEndpointMap: (sessionId: number) =>
+    api.get<EndpointMapResponse>('/proxy/map', { params: { session_id: sessionId } }).then((r) => r.data),
+  setEndpointFeature: (sessionId: number, host: string, pattern: string, feature: string | null) =>
+    api.post('/proxy/map/feature', { feature }, { params: { session_id: sessionId, host, pattern } }).then((r) => r.data),
 }

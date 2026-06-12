@@ -1,13 +1,14 @@
 import { NavLink } from 'react-router-dom'
-import { LayoutDashboard, Search, Radio, Zap, Terminal, Shield, Settings, ShieldAlert, GitCompare, ClipboardCheck, CreditCard, Flag, ArrowLeftRight, KeyRound, AlertOctagon, Cloud, Network, Brain } from 'lucide-react'
+import { LayoutDashboard, Search, Radio, Zap, Terminal, Shield, Settings, ShieldAlert, GitCompare, ClipboardCheck, CreditCard, Crosshair, ArrowLeftRight, KeyRound, AlertOctagon, Cloud, Network, Brain, Sword, Siren, FolderSearch } from 'lucide-react'
 import { clsx } from 'clsx'
 
 const NAV = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/proxy', icon: Radio, label: 'Proxy' },
   { to: '/repeater', icon: ArrowLeftRight, label: 'Repeater' },
+  { to: '/intruder', icon: Siren, label: 'Intruder' },
   { to: '/scanner', icon: ShieldAlert, label: 'Scanner' },
-  { to: '/ctf', icon: Flag, label: 'CTF Mode' },
+  { to: '/hunt', icon: Crosshair, label: 'Hunt (CTF + Bug Bounty)' },
   { to: '/auth-tester', icon: KeyRound, label: 'Auth & Session Tester' },
   { to: '/vuln-intel', icon: AlertOctagon, label: 'Vulnerability Intelligence' },
   { to: '/cloud-tester', icon: Cloud, label: 'Cloud Tester' },
@@ -18,6 +19,7 @@ const NAV = [
   { to: '/pci', icon: CreditCard, label: 'PCI DSS Scanner' },
   { to: '/agent', icon: Terminal, label: 'Agent Console' },
   { to: '/diff', icon: GitCompare, label: 'Diff / Change Detection' },
+  { to: '/explorer', icon: FolderSearch, label: 'Decompiler Explorer' },
   { to: '/checklist', icon: ClipboardCheck, label: 'Testing Checklist' },
   { to: '/settings', icon: Settings, label: 'Settings' },
 ]

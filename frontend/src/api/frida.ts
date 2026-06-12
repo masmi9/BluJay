@@ -16,4 +16,18 @@ export const fridaApi = {
     api.get<{ total: number; items: FridaEvent[] }>('/frida/events', { params: { session_id: sessionId, ...params } }).then((r) => r.data),
   processes: (serial: string) =>
     api.get<FridaProcess[]>(`/frida/processes/${serial}`).then((r) => r.data),
+  spawnAttach: (sessionId: number, deviceSerial: string, packageName: string, startupScript?: string) =>
+    api.post('/frida/sessions/spawn', { session_id: sessionId, device_serial: deviceSerial, package_name: packageName, startup_script: startupScript ?? null }).then((r) => r.data),
+  codeshareSearch: (q: string, page = 1) =>
+    api.get<{ results: CodeshareProject[]; next: string | null }>('/frida/codeshare/search', { params: { q, page } }).then((r) => r.data),
+  codeshareScript: (project: string) =>
+    api.get<{ project: string; source: string; title: string }>('/frida/codeshare/script', { params: { project } }).then((r) => r.data),
+}
+
+export interface CodeshareProject {
+  slug: string
+  title: string
+  description: string
+  author: string
+  tag_line?: string
 }

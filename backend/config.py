@@ -37,6 +37,10 @@ class Settings(BaseSettings):
     morph_agent_project: str = r"C:\Users\MalikSmith\repos\Malik_MobileMorph_Project\MobileMorphAgent\android_agent"
     morph_agent_apk: str = r"C:\Users\MalikSmith\repos\Malik_MobileMorph_Project\MobileMorphAgent\android_agent\app\build\outputs\apk\debug\mmagent-debug.apk"
 
+    # MobSF — secondary static analysis gateway (Docker: ghcr.io/mobsf/mobile-security-framework-mobsf)
+    mobsf_url: str = "http://localhost:8008"
+    mobsf_api_key: str = ""
+
     # Logging
     log_level: str = "INFO"
 

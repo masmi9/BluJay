@@ -55,7 +55,7 @@ class IntelligentCache:
         strategy: CacheStrategy = CacheStrategy.ADAPTIVE,
     ):
         self.cache_dir = Path(cache_dir)
-        self.cache_dir.mkdir(exist_ok=True)
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.max_size_mb = max_size_mb
         self.ttl_seconds = ttl_hours * 3600
         self.strategy = strategy

@@ -1,12 +1,13 @@
 import { useState, useCallback, useMemo } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { Upload, CheckCircle, XCircle, Loader2, Package, Smartphone, Search, ArrowRight, Tablet, ShieldCheck, ShieldOff, Trash2, Zap, RefreshCw } from 'lucide-react'
+import { Upload, CheckCircle, XCircle, Loader2, Package, Smartphone, Search, ArrowRight, Tablet, ShieldCheck, ShieldOff, Trash2, Zap, RefreshCw, Store } from 'lucide-react'
 import { clsx } from 'clsx'
 import { analysisApi } from '@/api/analysis'
 import { adbApi, sessionApi } from '@/api/adb'
 import { iosApi } from '@/api/ios'
 import { proxyApi } from '@/api/proxy'
+import { playstoreApi } from '@/api/playstore'
 import { useDeviceStore } from '@/store/deviceStore'
 import type { Analysis } from '@/types/analysis'
 import type { IosDeviceInfo } from '@/types/adb'
@@ -36,6 +37,11 @@ export default function Dashboard() {
   const [iosPulling, setIosPulling] = useState(false)
   const [iosDynStarting, setIosDynStarting] = useState(false)
   const [iosIpaFile, setIosIpaFile] = useState<File | null>(null)
+  const [psPackage, setPsPackage] = useState('')
+  const [psEmail, setPsEmail] = useState('')
+  const [psPassword, setPsPassword] = useState('')
+  const [psDownloading, setPsDownloading] = useState(false)
+  const [psError, setPsError] = useState<string | null>(null)
 
   const { devices, selectedSerial, selectDevice } = useDeviceStore()
 
@@ -195,6 +201,25 @@ export default function Dashboard() {
     if (file) handleFile(file)
   }, [handleFile])
 
+  const handlePlayStoreDownload = useCallback(async () => {
+    if (!psPackage.trim()) return
+    setPsDownloading(true)
+    setPsError(null)
+    try {
+      const result = await playstoreApi.download({
+        package_name: psPackage.trim(),
+        email: psEmail || undefined,
+        password: psPassword || undefined,
+      })
+      refetch()
+      navigate(`/analysis/${result.id}`)
+    } catch (err: any) {
+      setPsError(err.message)
+    } finally {
+      setPsDownloading(false)
+    }
+  }, [psPackage, psEmail, psPassword, navigate, refetch])
+
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
       <h1 className="text-lg font-semibold text-zinc-100">Dashboard</h1>
@@ -230,6 +255,49 @@ export default function Dashboard() {
             <p className="text-sm text-zinc-400 text-center">
               {uploading ? 'Uploading and analysing...' : 'Drop an APK or IPA here, or click to browse'}
             </p>
+          </div>
+        </div>
+
+        {/* --- Play Store Download --- */}
+        <div className="space-y-2">
+          <h2 className="text-xs text-zinc-500 uppercase tracking-wide flex items-center gap-1.5"><Store size={11} /> Play Store</h2>
+          <div className="bg-bg-surface rounded-xl border border-bg-border p-4 space-y-3 min-h-36">
+            <p className="text-xs text-zinc-500">Download an APK directly from Google Play by package name, then run static analysis.</p>
+            <input
+              type="text"
+              placeholder="com.example.app"
+              value={psPackage}
+              onChange={(e) => setPsPackage(e.target.value)}
+              className="w-full bg-bg-elevated border border-bg-border rounded px-2 py-1.5 text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-accent"
+            />
+            <details className="group">
+              <summary className="text-xs text-zinc-600 cursor-pointer select-none hover:text-zinc-400">Google credentials (optional, for auth-walled apps)</summary>
+              <div className="mt-2 space-y-2">
+                <input
+                  type="email"
+                  placeholder="Google email"
+                  value={psEmail}
+                  onChange={(e) => setPsEmail(e.target.value)}
+                  className="w-full bg-bg-elevated border border-bg-border rounded px-2 py-1.5 text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-accent"
+                />
+                <input
+                  type="password"
+                  placeholder="App password (not Google password)"
+                  value={psPassword}
+                  onChange={(e) => setPsPassword(e.target.value)}
+                  className="w-full bg-bg-elevated border border-bg-border rounded px-2 py-1.5 text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-accent"
+                />
+              </div>
+            </details>
+            {psError && <p className="text-xs text-red-400">{psError}</p>}
+            <button
+              onClick={handlePlayStoreDownload}
+              disabled={psDownloading || !psPackage.trim()}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-accent text-white text-xs hover:bg-accent/80 disabled:opacity-40 transition-colors w-full justify-center"
+            >
+              {psDownloading ? <Loader2 size={12} className="animate-spin" /> : <Store size={12} />}
+              {psDownloading ? 'Downloading…' : 'Download & Analyze'}
+            </button>
           </div>
         </div>
 
@@ -515,6 +583,9 @@ export default function Dashboard() {
             )}
           </div>
         </div>
+
+        {/* --- App Store IPA Download (IPATool) --- */}
+        <AppStorePanel navigate={navigate} refetch={refetch} />
       </div>
 
       {/* Recent analyses */}
@@ -554,6 +625,86 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// ── App Store IPA panel ───────────────────────────────────────────────────────
+
+function AppStorePanel({ navigate, refetch }: { navigate: (path: string) => void; refetch: () => void }) {
+  const [bundleId, setBundleId] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [purchase, setPurchase] = useState(false)
+  const [downloading, setDownloading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleDownload = async () => {
+    if (!bundleId.trim() || !email.trim() || !password.trim()) return
+    setDownloading(true)
+    setError(null)
+    try {
+      const r = await fetch('/api/v1/ipa/download', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bundle_id: bundleId.trim(), email: email.trim(), password, purchase }),
+      })
+      if (!r.ok) {
+        const body = await r.json().catch(() => ({ detail: r.statusText }))
+        throw new Error(body.detail ?? r.statusText)
+      }
+      const result = await r.json()
+      refetch()
+      navigate(`/analysis/${result.id}`)
+    } catch (e: any) {
+      setError(e.message)
+    } finally {
+      setDownloading(false)
+    }
+  }
+
+  return (
+    <div className="space-y-2">
+      <h2 className="text-xs text-zinc-500 uppercase tracking-wide flex items-center gap-1.5">
+        <Store size={11} /> App Store IPA
+      </h2>
+      <div className="bg-bg-surface rounded-xl border border-bg-border p-4 space-y-3 min-h-36">
+        <p className="text-xs text-zinc-500">Download an IPA from the Apple App Store by bundle ID using ipatool.</p>
+        <input
+          type="text"
+          placeholder="com.example.app"
+          value={bundleId}
+          onChange={(e) => setBundleId(e.target.value)}
+          className="w-full bg-bg-elevated border border-bg-border rounded px-2 py-1.5 text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-accent"
+        />
+        <input
+          type="email"
+          placeholder="Apple ID email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="w-full bg-bg-elevated border border-bg-border rounded px-2 py-1.5 text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-accent"
+        />
+        <input
+          type="password"
+          placeholder="App-specific password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          className="w-full bg-bg-elevated border border-bg-border rounded px-2 py-1.5 text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-accent"
+        />
+        <label className="flex items-center gap-1.5 text-xs text-zinc-500 cursor-pointer">
+          <input type="checkbox" checked={purchase} onChange={(e) => setPurchase(e.target.checked)} className="accent-accent" />
+          Auto-purchase (free apps only)
+        </label>
+        {error && <p className="text-xs text-red-400">{error}</p>}
+        <button
+          onClick={handleDownload}
+          disabled={downloading || !bundleId.trim() || !email.trim() || !password.trim()}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-accent text-white text-xs hover:bg-accent/80 disabled:opacity-40 transition-colors w-full justify-center"
+        >
+          {downloading ? <Loader2 size={12} className="animate-spin" /> : <Store size={12} />}
+          {downloading ? 'Downloading…' : 'Download & Analyze'}
+        </button>
+      </div>
     </div>
   )
 }
