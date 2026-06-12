@@ -1,10 +1,10 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Virtuoso } from 'react-virtuoso'
-import { Zap, Play, Square, Trash2, ChevronDown, ChevronRight, Save, X, BookOpen, RefreshCw, Search, Terminal, StopCircle, Send } from 'lucide-react'
+import { Zap, Play, Square, Trash2, ChevronDown, ChevronRight, Save, X, BookOpen, RefreshCw, Search, Terminal, StopCircle, Send, Globe, Download } from 'lucide-react'
 import { clsx } from 'clsx'
 import Editor from '@monaco-editor/react'
-import { fridaApi } from '@/api/frida'
+import { fridaApi, type CodeshareProject } from '@/api/frida'
 import { iosApi } from '@/api/ios'
 import { objectionApi } from '@/api/objection'
 import { useDeviceStore } from '@/store/deviceStore'
@@ -373,6 +373,12 @@ export default function FridaPage() {
   const [saveDialogOpen, setSaveDialogOpen] = useState(false)
   const [saveName, setSaveName] = useState('')
   const [attachError, setAttachError] = useState<string | null>(null)
+  const [spawnMode, setSpawnMode] = useState(false)
+  const [codeshareQuery, setCodeshareQuery] = useState('')
+  const [codeshareResults, setCodeshareResults] = useState<CodeshareProject[]>([])
+  const [codeshareLoading, setCodeshareLoading] = useState(false)
+  const [codeshareError, setCodeshareError] = useState<string | null>(null)
+  const [fetchingScript, setFetchingScript] = useState<string | null>(null)
 
   const { events, clear } = useFridaEvents(attached ? sessionId : null)
 
@@ -418,10 +424,42 @@ export default function FridaPage() {
     if (!attachSerial || !attachPackage) return
     setAttachError(null)
     try {
-      await fridaApi.attach(sessionId, attachSerial, attachPackage)
+      if (spawnMode) {
+        await fridaApi.spawnAttach(sessionId, attachSerial, attachPackage, customScript !== '// Your Frida script here\nJava.perform(function() {\n  // ...\n});\n' ? customScript : undefined)
+      } else {
+        await fridaApi.attach(sessionId, attachSerial, attachPackage)
+      }
       setFridaAttached(true, attachPackage, attachSerial, sessionId)
     } catch (e: any) {
       setAttachError(e?.response?.data?.detail ?? e?.message ?? 'Attach failed')
+    }
+  }
+
+  const searchCodeshare = async () => {
+    setCodeshareLoading(true)
+    setCodeshareError(null)
+    try {
+      const data = await fridaApi.codeshareSearch(codeshareQuery)
+      setCodeshareResults(data.results ?? [])
+    } catch (e: any) {
+      setCodeshareError(e?.response?.data?.detail ?? e?.message ?? 'Codeshare unavailable')
+      setCodeshareResults([])
+    } finally {
+      setCodeshareLoading(false)
+    }
+  }
+
+  const loadFromCodeshare = async (slug: string) => {
+    setFetchingScript(slug)
+    try {
+      const data = await fridaApi.codeshareScript(slug)
+      setCustomScript(data.source)
+      setActiveTab('editor')
+      setPageTab('frida')
+    } catch (e: any) {
+      setCodeshareError(e?.response?.data?.detail ?? e?.message ?? 'Failed to load script')
+    } finally {
+      setFetchingScript(null)
     }
   }
 
@@ -467,7 +505,7 @@ export default function FridaPage() {
     setActiveTab('editor')
   }
 
-  const [pageTab, setPageTab] = useState<'frida' | 'objection'>('frida')
+  const [pageTab, setPageTab] = useState<'frida' | 'objection' | 'codeshare'>('frida')
 
   return (
     <div className="flex flex-col h-full">
@@ -495,11 +533,73 @@ export default function FridaPage() {
         >
           <Terminal size={12} /> Objection
         </button>
+        <button
+          onClick={() => setPageTab('codeshare')}
+          className={clsx(
+            'flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium border-b-2 transition-colors',
+            pageTab === 'codeshare'
+              ? 'border-blue-400 text-blue-400'
+              : 'border-transparent text-zinc-500 hover:text-zinc-300'
+          )}
+        >
+          <Globe size={12} /> Codeshare
+        </button>
       </div>
 
       {/* Objection tab */}
       {pageTab === 'objection' && (
         <ObjectionPanel serial={selectedSerial} />
+      )}
+
+      {/* Codeshare tab */}
+      {pageTab === 'codeshare' && (
+        <div className="flex flex-col flex-1 overflow-hidden p-4 space-y-4">
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-500" />
+              <input
+                type="text"
+                placeholder="Search Frida Codeshare (e.g. ssl pinning, root detection)…"
+                value={codeshareQuery}
+                onChange={(e) => setCodeshareQuery(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && searchCodeshare()}
+                className="w-full bg-bg-elevated border border-bg-border rounded pl-8 pr-3 py-1.5 text-xs text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-accent"
+              />
+            </div>
+            <button
+              onClick={searchCodeshare}
+              disabled={codeshareLoading}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-blue-600 text-white text-xs hover:bg-blue-500 disabled:opacity-50 transition-colors"
+            >
+              {codeshareLoading ? <RefreshCw size={11} className="animate-spin" /> : <Search size={11} />}
+              Search
+            </button>
+          </div>
+          {codeshareError && <p className="text-xs text-red-400">{codeshareError}</p>}
+          <div className="flex-1 overflow-auto space-y-2">
+            {codeshareResults.length === 0 && !codeshareLoading && (
+              <p className="text-xs text-zinc-600 pt-4">Search Frida Codeshare to browse community scripts. Results will appear here.</p>
+            )}
+            {codeshareResults.map((proj) => (
+              <div key={proj.slug} className="flex items-start gap-3 p-3 bg-bg-surface rounded-lg border border-bg-border">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-zinc-200 truncate">{proj.title || proj.slug}</p>
+                  <p className="text-xs text-zinc-500 mt-0.5 truncate">{proj.description || proj.tag_line || ''}</p>
+                  <p className="text-xs text-zinc-600 mt-0.5 font-mono">{proj.slug}</p>
+                </div>
+                <button
+                  onClick={() => loadFromCodeshare(proj.slug)}
+                  disabled={fetchingScript === proj.slug}
+                  title="Load into editor"
+                  className="flex items-center gap-1 px-2 py-1 text-xs rounded bg-bg-elevated hover:bg-blue-600/20 text-blue-400 border border-bg-border shrink-0 transition-colors disabled:opacity-50"
+                >
+                  {fetchingScript === proj.slug ? <RefreshCw size={11} className="animate-spin" /> : <Download size={11} />}
+                  Load
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
 
       {/* Frida tab */}
@@ -628,14 +728,24 @@ export default function FridaPage() {
               </p>
             )}
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <button
                 onClick={attach}
                 disabled={!attachSerial || !attachPackage}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30 disabled:opacity-40 transition-colors"
               >
-                <Zap size={12} /> Attach to {attachPackage || '…'}
+                <Zap size={12} /> {spawnMode ? 'Spawn & Attach' : 'Attach to'} {attachPackage || '…'}
               </button>
+              <label className="flex items-center gap-1.5 text-xs text-zinc-500 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={spawnMode}
+                  onChange={(e) => setSpawnMode(e.target.checked)}
+                  className="accent-yellow-400 cursor-pointer"
+                />
+                Spawn mode
+                <span className="text-zinc-600">(inject at startup, uses editor script)</span>
+              </label>
               {attachError && (
                 <span className="text-xs text-red-400">{attachError}</span>
               )}

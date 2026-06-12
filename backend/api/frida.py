@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -158,6 +159,73 @@ async def unload_script(session_id: int, script_id: str):
     fm = get_frida_manager()
     await fm.unload_script(session_id, script_id)
     return {"status": "unloaded"}
+
+
+@router.get("/codeshare/search")
+async def codeshare_search(q: str = Query(""), page: int = 1):
+    """Proxy search queries to the Frida Codeshare API."""
+    import httpx
+    url = f"https://codeshare.frida.re/api/v1/projects/?q={q}&page={page}"
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            r = await client.get(url, headers={"Accept": "application/json"})
+            r.raise_for_status()
+            return r.json()
+    except Exception as exc:
+        raise HTTPException(502, f"Codeshare unreachable: {exc}") from exc
+
+
+@router.get("/codeshare/script")
+async def codeshare_script(project: str = Query(...)):
+    """
+    Fetch the JS source for a Frida Codeshare project.
+    project format: @author/name  (e.g. @pcipolloni/universal-android-ssl-pinning-bypass-with-frida)
+    """
+    import httpx
+    meta_url = f"https://codeshare.frida.re/api/v1/projects/{project}/"
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            r = await client.get(meta_url, headers={"Accept": "application/json"})
+            r.raise_for_status()
+            data = r.json()
+        source_url = data.get("source") or data.get("script_url")
+        if not source_url:
+            raise HTTPException(404, "Codeshare project found but no script source URL")
+        async with httpx.AsyncClient(timeout=15) as client:
+            src_r = await client.get(source_url)
+            src_r.raise_for_status()
+            return {"project": project, "source": src_r.text, "title": data.get("title", project)}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(502, f"Codeshare error: {exc}") from exc
+
+
+class SpawnAttachRequest(BaseModel):
+    session_id: int
+    device_serial: str
+    package_name: str
+    startup_script: str | None = None
+
+
+@router.post("/sessions/spawn")
+async def spawn_attach(body: SpawnAttachRequest):
+    """
+    Spawn the app fresh, attach before it resumes, optionally load a startup script,
+    then resume — gives the script maximum coverage from process start.
+    """
+    from api.router import get_frida_manager
+    fm = get_frida_manager()
+    try:
+        result = await fm.spawn_attach(
+            body.session_id,
+            body.device_serial,
+            body.package_name,
+            startup_script=body.startup_script,
+        )
+    except RuntimeError as e:
+        raise HTTPException(500, str(e))
+    return result
 
 
 @router.get("/events", response_model=FridaEventsResponse)

@@ -314,3 +314,55 @@ async def read_source_file(
         raise HTTPException(500, str(e))
 
     return {"path": path, "content": content}
+
+
+@router.get("/{analysis_id}/source/search")
+async def search_source(
+    analysis_id: int,
+    q: str = Query(..., min_length=2),
+    max_results: int = Query(200, ge=1, le=1000),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Full-text search across all decompiled source files.
+    Returns up to max_results matches with file path, line number, and matched line.
+    """
+    import asyncio
+
+    result = await db.execute(select(Analysis).where(Analysis.id == analysis_id))
+    analysis = result.scalar_one_or_none()
+    if not analysis:
+        raise HTTPException(404, "Analysis not found")
+
+    base = Path(analysis.jadx_path or analysis.decompile_path or "")
+    if not base.exists():
+        raise HTTPException(409, "Source not yet available — run analysis first")
+
+    q_lower = q.lower()
+    matches = []
+
+    def _search_sync():
+        found = []
+        for fpath in base.rglob("*"):
+            if not fpath.is_file():
+                continue
+            if fpath.stat().st_size > 2 * 1024 * 1024:
+                continue  # skip files > 2 MB
+            try:
+                text = fpath.read_text(encoding="utf-8", errors="replace")
+                for lineno, line in enumerate(text.splitlines(), 1):
+                    if q_lower in line.lower():
+                        found.append({
+                            "file": str(fpath.relative_to(base)),
+                            "line": lineno,
+                            "match": line.strip()[:200],
+                        })
+                        if len(found) >= max_results:
+                            return found
+            except OSError:
+                continue
+        return found
+
+    loop = asyncio.get_event_loop()
+    matches = await loop.run_in_executor(None, _search_sync)
+    return {"query": q, "total": len(matches), "results": matches}

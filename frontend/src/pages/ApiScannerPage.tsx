@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { clsx } from 'clsx'
-import { ShieldAlert, TestTube2, KeyRound, Radar, Wrench, Globe, Workflow, Search, Bot } from 'lucide-react'
+import { ShieldAlert, TestTube2, KeyRound, Radar, Wrench, Globe, Workflow, Search, Bot, Sword, Ghost } from 'lucide-react'
 import AIAgentPage from '@/pages/AIAgentPage'
 import ScannerPage from '@/pages/ScannerPage'
 import ApiTesting from '@/pages/ApiTesting'
@@ -10,19 +10,22 @@ import RepackagePage from '@/pages/RepackagePage'
 import WsTestPage from '@/pages/WsTestPage'
 import GraphqlPage from '@/pages/GraphqlPage'
 import ReconPage from '@/pages/ReconPage'
+import { MetasploitTab, GhostTab } from '@/pages/RedTeamPage'
 
 const STORAGE_KEY = 'api-scanner-active-tab'
 
 const TABS = [
-  { id: 'ai-agents', label: 'AI Agents',    icon: Bot },
-  { id: 'scanner',   label: 'API Scanner',  icon: ShieldAlert },
-  { id: 'api',       label: 'API Testing',  icon: TestTube2 },
-  { id: 'brute',     label: 'Brute Force',  icon: KeyRound },
-  { id: 'ws',        label: 'WebSocket',    icon: Workflow },
-  { id: 'graphql',   label: 'GraphQL',      icon: Globe },
-  { id: 'recon',     label: 'Recon',        icon: Search },
-  { id: 'repackage', label: 'Repackage',    icon: Wrench },
-  { id: 'strix',     label: 'Strix Pentest',icon: Radar },
+  { id: 'ai-agents',   label: 'AI Agents',     icon: Bot },
+  { id: 'scanner',     label: 'API Scanner',   icon: ShieldAlert },
+  { id: 'api',         label: 'API Testing',   icon: TestTube2 },
+  { id: 'brute',       label: 'Brute Force',   icon: KeyRound },
+  { id: 'ws',          label: 'WebSocket',     icon: Workflow },
+  { id: 'graphql',     label: 'GraphQL',       icon: Globe },
+  { id: 'recon',       label: 'Recon',         icon: Search },
+  { id: 'repackage',   label: 'Repackage',     icon: Wrench },
+  { id: 'strix',       label: 'Strix Pentest', icon: Radar },
+  { id: 'metasploit',  label: 'Metasploit',    icon: Sword },
+  { id: 'ghost',       label: 'Ghost C2',      icon: Ghost },
 ] as const
 
 type TabId = typeof TABS[number]['id']
@@ -87,6 +90,12 @@ export default function ApiScannerPage() {
       </div>
       <div className={clsx('flex-1 overflow-auto', active !== 'strix' && 'hidden')}>
         <StrixPage />
+      </div>
+      <div className={clsx('flex-1 overflow-auto', active !== 'metasploit' && 'hidden')}>
+        <MetasploitTab />
+      </div>
+      <div className={clsx('flex-1 overflow-auto', active !== 'ghost' && 'hidden')}>
+        <GhostTab />
       </div>
     </div>
   )

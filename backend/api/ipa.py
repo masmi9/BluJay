@@ -72,6 +72,79 @@ async def _repack_with_7zip(src: Path, dest: Path) -> bool:
     return await loop.run_in_executor(None, functools.partial(_repack_with_7zip_sync, src, dest))
 
 
+from pydantic import BaseModel as _BaseModel
+
+
+async def _run_ipa_analysis(
+    ipa_path: Path,
+    filename: str,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession,
+) -> Analysis:
+    """Shared helper: create Analysis row for an IPA and start the pipeline."""
+    import hashlib
+    h = hashlib.sha256()
+    with open(ipa_path, "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            h.update(chunk)
+    sha256 = h.hexdigest()
+
+    existing = await db.execute(select(Analysis).where(Analysis.apk_sha256 == sha256))
+    if ex := existing.scalar_one_or_none():
+        return ex
+
+    analysis = Analysis(
+        apk_filename=filename,
+        apk_sha256=sha256,
+        upload_path=str(ipa_path),
+        platform="ios",
+        status="pending",
+    )
+    db.add(analysis)
+    await db.commit()
+    await db.refresh(analysis)
+
+    queue: asyncio.Queue = asyncio.Queue()
+    _ipa_progress_queues[analysis.id] = queue
+
+    async def _run():
+        from core.ipa_analyzer import run_ipa_analysis
+        await run_ipa_analysis(analysis.id, str(ipa_path), queue, AsyncSessionLocal)
+        _ipa_progress_queues.pop(analysis.id, None)
+
+    background_tasks.add_task(_run)
+    return analysis
+
+
+class IPAToolDownloadRequest(_BaseModel):
+    bundle_id: str
+    email: str
+    password: str
+    purchase: bool = False
+
+
+@router.post("/download", response_model=AnalysisSummary, status_code=201)
+async def download_from_appstore(
+    req: IPAToolDownloadRequest,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Download an IPA from the App Store via ipatool and run IPA analysis.
+    Requires ipatool installed and an Apple ID with access to the app.
+    """
+    from core.ipatool_downloader import download as _dl
+
+    try:
+        ipa_path = await _dl(req.bundle_id, req.email, req.password, req.purchase)
+    except FileNotFoundError as exc:
+        raise HTTPException(503, str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(502, str(exc)) from exc
+
+    return await _run_ipa_analysis(ipa_path, ipa_path.name, background_tasks, db)
+
+
 @router.post("", response_model=AnalysisSummary, status_code=201)
 async def upload_ipa(
     background_tasks: BackgroundTasks,
