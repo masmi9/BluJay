@@ -41,6 +41,18 @@ BUILTIN_SCRIPTS = {
         "description": "Hooks javax.crypto.Cipher, SecretKey, and Mac to log algorithm, keys, and plaintext/ciphertext",
         "hooks": ["javax.crypto.Cipher", "javax.crypto.Mac", "javax.crypto.SecretKeyFactory"],
     },
+    "biometric_bypass": {
+        "name": "Biometric Bypass",
+        "filename": "biometric_bypass.js",
+        "description": "Bypasses unbound BiometricPrompt, AndroidX BiometricPrompt, and legacy FingerprintManager by forcing onAuthenticationSucceeded",
+        "hooks": ["BiometricPrompt.AuthenticationCallback", "androidx.biometric.BiometricPrompt$AuthenticationCallback", "FingerprintManager.AuthenticationCallback"],
+    },
+    "android_storage_audit": {
+        "name": "Android Storage Audit",
+        "filename": "android_storage_audit.js",
+        "description": "Hooks SharedPreferences (read/write), SQLiteDatabase (rawQuery/execSQL/insert), and FileOutputStream to log all local storage activity",
+        "hooks": ["SharedPreferencesImpl", "SharedPreferencesImpl$EditorImpl", "SQLiteDatabase", "FileOutputStream"],
+    },
     # iOS scripts
     "ios_ssl_pinning_bypass": {
         "name": "iOS SSL Pinning Bypass",
@@ -54,6 +66,13 @@ BUILTIN_SCRIPTS = {
         "filename": "ios_jailbreak_bypass.js",
         "description": "Hides common jailbreak paths from NSFileManager and canOpenURL checks",
         "hooks": ["NSFileManager fileExistsAtPath:", "UIApplication canOpenURL:"],
+        "platform": "ios",
+    },
+    "ios_keychain_dump": {
+        "name": "iOS Keychain Dump",
+        "filename": "ios_keychain_dump.js",
+        "description": "Intercepts SecItemCopyMatching to log all keychain reads — service, account, and decoded secret values",
+        "hooks": ["SecItemCopyMatching"],
         "platform": "ios",
     },
 }

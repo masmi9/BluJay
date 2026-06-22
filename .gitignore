@@ -59,9 +59,6 @@ scanners/*/output/
 Thumbs.db
 desktop.ini
 
-# Claude
-.claude/
-
 # Virtual Environment
 test/
 venv/
